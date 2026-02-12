@@ -14,22 +14,32 @@
 const {JsonSchema} = require('@rushstack/node-core-library');
 const path = require('path');
 
+function getSchemaPath(): string {
+  if (process.env.NODE_ENV === 'test') {
+    return path.resolve(
+      process.cwd(),
+      'compiler',
+      'crates',
+      'relay-compiler',
+      'relay-compiler-config-schema.json',
+    );
+  }
+  return path.join(__dirname, '..', 'relay-compiler-config-schema.json');
+}
+
 function loadSchema(): any {
-  return JsonSchema.fromFile(
-    path.join(__dirname, 'relay-compiler-config-schema.json'),
-    {
-      customFormats: {
-        uint8: {
-          type: 'number',
-          validate: data => data >= 0 && data <= 255,
-        },
-        uint: {
-          type: 'number',
-          validate: data => data >= 0 && data <= Number.MAX_SAFE_INTEGER,
-        },
+  return JsonSchema.fromFile(getSchemaPath(), {
+    customFormats: {
+      uint8: {
+        type: 'number',
+        validate: data => data >= 0 && data <= 255,
+      },
+      uint: {
+        type: 'number',
+        validate: data => data >= 0 && data <= Number.MAX_SAFE_INTEGER,
       },
     },
-  );
+  });
 }
 
 module.exports = loadSchema;
