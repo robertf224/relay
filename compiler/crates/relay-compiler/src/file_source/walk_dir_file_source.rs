@@ -17,10 +17,10 @@ use relay_typegen::TypegenLanguage;
 use walkdir::WalkDir;
 
 use super::File;
+use crate::FileSourceResult;
 use crate::compiler_state::CompilerState;
 use crate::config::Config;
 use crate::errors::Result;
-use crate::FileSourceResult;
 
 #[derive(Debug)]
 pub struct WalkDirFileSourceResult {
@@ -77,8 +77,11 @@ impl WalkDirFileSource {
     }
 
     fn find_files(&self) -> Vec<File> {
-        WalkDir::new(self.config.root_dir.clone())
-            .into_iter()
+        self.config
+            .get_all_roots()
+            .iter()
+            .map(|source| self.config.root_dir.join(source))
+            .flat_map(WalkDir::new)
             .filter_map(|entry| {
                 let dir_entry = entry.ok()?;
                 let relative_path = dir_entry
@@ -113,5 +116,14 @@ impl WalkDirFileSource {
         setup_event.complete();
 
         Ok(compiler_state)
+    }
+
+    /// Query all files in the configured roots.
+    /// This is used by the test file source subscription for rescanning.
+    pub fn query_files(&self) -> Result<WalkDirFileSourceResult> {
+        Ok(WalkDirFileSourceResult {
+            files: self.find_files(),
+            resolved_root: self.config.root_dir.clone(),
+        })
     }
 }

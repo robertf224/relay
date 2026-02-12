@@ -10,10 +10,10 @@ use std::hash::Hash;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use ::intern::Lookup;
 use ::intern::intern;
 use ::intern::string_key::Intern;
 use ::intern::string_key::StringKey;
-use ::intern::Lookup;
 use common::ArgumentName;
 use common::DirectiveName;
 use common::NamedItem;
@@ -32,19 +32,23 @@ use graphql_ir::LinkedField;
 use graphql_ir::OperationDefinition;
 use graphql_ir::ScalarField;
 use graphql_ir::Selection;
-use indexmap::map::Entry;
 use indexmap::IndexMap;
 use indexmap::IndexSet;
+use indexmap::map::Entry;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use relay_config::CustomType;
 use relay_config::CustomTypeImport;
 use relay_config::ResolverContextTypeInput;
 use relay_config::TypegenLanguage;
-use relay_schema::definitions::ResolverType;
 use relay_schema::CUSTOM_SCALAR_DIRECTIVE_NAME;
 use relay_schema::EXPORT_NAME_CUSTOM_SCALAR_ARGUMENT_NAME;
 use relay_schema::PATH_CUSTOM_SCALAR_ARGUMENT_NAME;
+use relay_schema::definitions::ResolverType;
+use relay_transforms::ASSIGNABLE_DIRECTIVE_FOR_TYPEGEN;
+use relay_transforms::CATCH_DIRECTIVE_NAME;
+use relay_transforms::CHILDREN_CAN_BUBBLE_METADATA_KEY;
+use relay_transforms::CLIENT_EXTENSION_DIRECTIVE_NAME;
 use relay_transforms::CatchMetadataDirective;
 use relay_transforms::CatchTo;
 use relay_transforms::ClientEdgeMetadata;
@@ -52,16 +56,13 @@ use relay_transforms::FragmentAliasMetadata;
 use relay_transforms::FragmentDataInjectionMode;
 use relay_transforms::ModuleMetadata;
 use relay_transforms::NoInlineFragmentSpreadMetadata;
+use relay_transforms::RELAY_ACTOR_CHANGE_DIRECTIVE_FOR_CODEGEN;
 use relay_transforms::RelayResolverMetadata;
 use relay_transforms::RequiredMetadataDirective;
 use relay_transforms::ResolverOutputTypeInfo;
 use relay_transforms::TypeConditionInfo;
-use relay_transforms::ASSIGNABLE_DIRECTIVE_FOR_TYPEGEN;
-use relay_transforms::CATCH_DIRECTIVE_NAME;
-use relay_transforms::CHILDREN_CAN_BUBBLE_METADATA_KEY;
-use relay_transforms::CLIENT_EXTENSION_DIRECTIVE_NAME;
-use relay_transforms::RELAY_ACTOR_CHANGE_DIRECTIVE_FOR_CODEGEN;
 use relay_transforms::UPDATABLE_DIRECTIVE_FOR_TYPEGEN;
+use relay_transforms::relay_resolvers::ResolverSchemaGenType;
 use schema::EnumID;
 use schema::Field;
 use schema::ObjectID;
@@ -71,6 +72,24 @@ use schema::Schema;
 use schema::Type;
 use schema::TypeReference;
 
+use crate::FRAGMENT_PROP_NAME;
+use crate::KEY_DATA_ID;
+use crate::KEY_FRAGMENT_SPREADS;
+use crate::KEY_FRAGMENT_TYPE;
+use crate::KEY_TYPENAME;
+use crate::KEY_UPDATABLE_FRAGMENT_SPREADS;
+use crate::LIVE_STATE_TYPE;
+use crate::MODULE_COMPONENT;
+use crate::MaskStatus;
+use crate::RESPONSE;
+use crate::RESULT_TYPE_NAME;
+use crate::TYPE_BOOLEAN;
+use crate::TYPE_FLOAT;
+use crate::TYPE_ID;
+use crate::TYPE_INT;
+use crate::TYPE_STRING;
+use crate::TypegenContext;
+use crate::VARIABLES;
 use crate::type_selection::ModuleDirective;
 use crate::type_selection::RawResponseFragmentSpread;
 use crate::type_selection::ScalarFieldSpecialSchemaField;
@@ -95,6 +114,7 @@ use crate::typegen_state::MatchFields;
 use crate::typegen_state::ResolverContextType;
 use crate::typegen_state::RuntimeImports;
 use crate::write::CustomScalarsImports;
+use crate::writer::AST;
 use crate::writer::ExactObject;
 use crate::writer::FunctionTypeAssertion;
 use crate::writer::GetterSetterPairProp;
@@ -105,25 +125,6 @@ use crate::writer::SortedASTList;
 use crate::writer::SortedStringKeyList;
 use crate::writer::SpreadProp;
 use crate::writer::StringLiteral;
-use crate::writer::AST;
-use crate::MaskStatus;
-use crate::TypegenContext;
-use crate::FRAGMENT_PROP_NAME;
-use crate::KEY_DATA_ID;
-use crate::KEY_FRAGMENT_SPREADS;
-use crate::KEY_FRAGMENT_TYPE;
-use crate::KEY_TYPENAME;
-use crate::KEY_UPDATABLE_FRAGMENT_SPREADS;
-use crate::LIVE_STATE_TYPE;
-use crate::MODULE_COMPONENT;
-use crate::RESPONSE;
-use crate::RESULT_TYPE_NAME;
-use crate::TYPE_BOOLEAN;
-use crate::TYPE_FLOAT;
-use crate::TYPE_ID;
-use crate::TYPE_INT;
-use crate::TYPE_STRING;
-use crate::VARIABLES;
 
 lazy_static! {
     static ref THROW_ON_FIELD_ERROR_DIRECTIVE: DirectiveName =
@@ -429,7 +430,7 @@ fn add_fragment_name_to_encountered_fragments(
 }
 
 fn get_fragment_data_type(fragment_name: StringKey) -> Box<AST> {
-    Box::new(AST::RawType(format!("{}$data", fragment_name).intern()))
+    Box::new(AST::RawType(format!("{fragment_name}$data").intern()))
 }
 
 fn add_model_argument_for_interface_resolver(
@@ -639,9 +640,21 @@ fn import_relay_resolver_function_type(
         None => None,
     };
 
-    let imported_resolver = ImportedResolver {
-        resolver_name,
-        resolver_type: generate_resolver_type(
+    let is_property_lookup = match resolver_metadata.resolver_type {
+        ResolverSchemaGenType::PropertyLookup { .. } => true,
+        ResolverSchemaGenType::ResolverModule => false,
+    };
+    let resolver_type = if (resolver_metadata.type_confirmed
+        && typegen_context
+            .project_config
+            .feature_flags
+            .omit_resolver_type_assertions_for_confirmed_types
+            .is_fully_enabled())
+        || is_property_lookup
+    {
+        None
+    } else {
+        Some(generate_resolver_type(
             typegen_context,
             input_object_types,
             encountered_enums,
@@ -653,15 +666,22 @@ fn import_relay_resolver_function_type(
             fragment_name,
             resolver_metadata,
             context_import,
-        ),
-        import_path,
-        context_import,
+        ))
     };
 
-    imported_resolvers
-        .0
-        .entry(local_resolver_name)
-        .or_insert(imported_resolver);
+    if !is_property_lookup {
+        let imported_resolver = ImportedResolver {
+            resolver_name,
+            resolver_type,
+            import_path,
+            context_import,
+        };
+
+        imported_resolvers
+            .0
+            .entry(local_resolver_name)
+            .or_insert(imported_resolver);
+    }
 }
 
 /// Check if the scalar field has the special type `RelayResolverValue`. This is a type that
@@ -958,16 +978,17 @@ fn visit_inline_fragment(
             runtime_imports,
             custom_error_import,
             enclosing_linked_field_concrete_type,
-            inline_fragment
-                .directives
-                .named(*THROW_ON_FIELD_ERROR_DIRECTIVE)
-                .is_some(),
+            emit_semantic_types
+                || inline_fragment
+                    .directives
+                    .named(*CATCH_DIRECTIVE_NAME)
+                    .is_some(),
         );
 
         let mut selections = if let Some(fragment_alias_metadata) =
             FragmentAliasMetadata::find(&inline_fragment.directives)
         {
-            // We will model the types as a linked filed containing just the fragment spread.
+            // We will model the types as a linked field containing just the fragment spread.
             let mut node_type = TypeReference::Named(fragment_alias_metadata.selection_type);
             if fragment_alias_metadata.non_nullable {
                 node_type = TypeReference::NonNull(Box::new(node_type));
@@ -980,14 +1001,16 @@ fn visit_inline_fragment(
                 &inline_fragment.directives,
                 false,
             );
+            let coerce_to_nullable = has_explicit_catch_to_null(&inline_fragment.directives);
+            let is_result_type = is_result_type_directive(&inline_fragment.directives);
+
             vec![TypeSelection::LinkedField(TypeSelectionLinkedField {
                 field_name_or_alias: fragment_alias_metadata.alias.item,
                 node_type,
                 node_selections: selections_to_map(inline_selections.into_iter(), true),
-                conditional: false,
+                conditional: coerce_to_nullable,
                 concrete_type: None,
-                // @catch cannot be used directly on an inline fragment.
-                is_result_type: false,
+                is_result_type,
             })]
         } else {
             // If the inline fragment is on an abstract type, its selections must be
@@ -1070,6 +1093,7 @@ fn visit_actor_change(
         value: AST::Nullable(Box::new(AST::ActorChangePoint(Box::new(
             selections_to_babel(
                 typegen_context,
+                &field.type_.inner(),
                 linked_field_selections.into_iter(),
                 MaskStatus::Masked,
                 None,
@@ -1146,11 +1170,11 @@ fn raw_response_visit_inline_fragment(
         }));
         return;
     }
-    if let Some(type_condition) = inline_fragment.type_condition {
-        if !type_condition.is_abstract_type() {
-            for selection in &mut selections {
-                selection.set_concrete_type(type_condition);
-            }
+    if let Some(type_condition) = inline_fragment.type_condition
+        && !type_condition.is_abstract_type()
+    {
+        for selection in &mut selections {
+            selection.set_concrete_type(type_condition);
         }
     }
     type_selections.append(&mut selections);
@@ -1232,30 +1256,30 @@ fn visit_scalar_field(
         &typegen_context.project_config.schema_config,
     );
 
-    if matches!(special_field, Some(ScalarFieldSpecialSchemaField::TypeName)) {
-        if let Some(concrete_type) = enclosing_linked_field_concrete_type {
-            // If we are creating a typename selection within a linked field with a concrete type, we generate
-            // the type e.g. "User", i.e. the concrete string name of the concrete type.
-            //
-            // This cannot be done within abstract fields and at the top level (even in fragments), because
-            // we have the following type hole. With `node { ...Fragment_user }`, `Fragment_user` can be
-            // unconditionally read out, without checking whether the `node` field actually has a matching
-            // type at runtime.
-            //
-            // Note that passing concrete_type: enclosing_linked_field_concrete_type here has the effect
-            // of making the emitted fields left-hand-optional, causing the compiler to panic (because
-            // within updatable fragments/queries, we expect never to generate an optional type.)
-            return type_selections.push(TypeSelection::ScalarField(TypeSelectionScalarField {
-                field_name_or_alias: key,
-                special_field,
-                value: AST::StringLiteral(StringLiteral(
-                    typegen_context.schema.get_type_name(concrete_type),
-                )),
-                conditional: false,
-                concrete_type: None,
-                is_result_type: is_result_type_directive(&scalar_field.directives),
-            }));
-        }
+    if matches!(special_field, Some(ScalarFieldSpecialSchemaField::TypeName))
+        && let Some(concrete_type) = enclosing_linked_field_concrete_type
+    {
+        // If we are creating a typename selection within a linked field with a concrete type, we generate
+        // the type e.g. "User", i.e. the concrete string name of the concrete type.
+        //
+        // This cannot be done within abstract fields and at the top level (even in fragments), because
+        // we have the following type hole. With `node { ...Fragment_user }`, `Fragment_user` can be
+        // unconditionally read out, without checking whether the `node` field actually has a matching
+        // type at runtime.
+        //
+        // Note that passing concrete_type: enclosing_linked_field_concrete_type here has the effect
+        // of making the emitted fields left-hand-optional, causing the compiler to panic (because
+        // within updatable fragments/queries, we expect never to generate an optional type.)
+        return type_selections.push(TypeSelection::ScalarField(TypeSelectionScalarField {
+            field_name_or_alias: key,
+            special_field,
+            value: AST::StringLiteral(StringLiteral(
+                typegen_context.schema.get_type_name(concrete_type),
+            )),
+            conditional: false,
+            concrete_type: None,
+            is_result_type: is_result_type_directive(&scalar_field.directives),
+        }));
     }
 
     let ast = transform_type_reference_into_ast(&field_type, |type_| {
@@ -1270,6 +1294,38 @@ fn visit_scalar_field(
         concrete_type: None,
         is_result_type,
     }));
+}
+
+#[allow(clippy::too_many_arguments)]
+fn raw_response_visit_condition(
+    typegen_context: &'_ TypegenContext<'_>,
+    type_selections: &mut Vec<TypeSelection>,
+    condition: &Condition,
+    encountered_enums: &mut EncounteredEnums,
+    match_fields: &mut MatchFields,
+    encountered_fragments: &mut EncounteredFragments,
+    imported_raw_response_types: &mut ImportedRawResponseTypes,
+    runtime_imports: &mut RuntimeImports,
+    custom_scalars: &mut CustomScalarsImports,
+    enclosing_linked_field_concrete_type: Option<Type>,
+    is_throw_on_field_error: bool,
+) {
+    let mut selections = raw_response_visit_selections(
+        typegen_context,
+        &condition.selections,
+        encountered_enums,
+        match_fields,
+        encountered_fragments,
+        imported_raw_response_types,
+        runtime_imports,
+        custom_scalars,
+        enclosing_linked_field_concrete_type,
+        is_throw_on_field_error,
+    );
+    for selection in selections.iter_mut() {
+        selection.set_conditional(true);
+    }
+    type_selections.append(&mut selections);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1313,6 +1369,7 @@ fn visit_condition(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn get_data_type(
     typegen_context: &'_ TypegenContext<'_>,
+    concrete_type: &Type,
     selections: impl Iterator<Item = TypeSelection>,
     mask_status: MaskStatus,
     fragment_type_name: Option<StringKey>,
@@ -1326,6 +1383,7 @@ pub(crate) fn get_data_type(
 ) -> AST {
     let mut data_type = selections_to_babel(
         typegen_context,
+        concrete_type,
         selections,
         mask_status,
         fragment_type_name,
@@ -1347,6 +1405,7 @@ pub(crate) fn get_data_type(
 #[allow(clippy::too_many_arguments)]
 fn selections_to_babel(
     typegen_context: &'_ TypegenContext<'_>,
+    concrete_type: &Type,
     selections: impl Iterator<Item = TypeSelection>,
     mask_status: MaskStatus,
     fragment_type_name: Option<StringKey>,
@@ -1386,7 +1445,7 @@ fn selections_to_babel(
         }
     }
 
-    if should_emit_discriminated_union(&by_concrete_type, &base_fields) {
+    if should_emit_discriminated_union(concrete_type, &by_concrete_type, &base_fields) {
         get_discriminated_union_ast(
             by_concrete_type,
             &base_fields,
@@ -1446,38 +1505,38 @@ fn get_merged_object_with_optional_fields(
     }
     let mut props = group_refs(hashmap_into_values(selection_map))
         .map(|mut sel| {
-            if sel.is_typename() {
-                if let Some(concrete_type) = sel.get_enclosing_concrete_type() {
-                    sel.set_conditional(false);
-                    return make_prop(
-                        typegen_context,
-                        sel,
-                        mask_status,
-                        Some(concrete_type),
-                        encountered_enums,
-                        encountered_fragments,
-                        custom_scalars,
-                        runtime_imports,
-                        custom_error_import,
-                    );
-                }
+            if sel.is_typename()
+                && let Some(concrete_type) = sel.get_enclosing_concrete_type()
+            {
+                sel.set_conditional(false);
+                return make_prop(
+                    typegen_context,
+                    sel,
+                    mask_status,
+                    Some(concrete_type),
+                    encountered_enums,
+                    encountered_fragments,
+                    custom_scalars,
+                    runtime_imports,
+                    custom_error_import,
+                );
             }
-            if let TypeSelection::LinkedField(ref linked_field) = sel {
-                if let Some(concrete_type) = linked_field.concrete_type {
-                    let mut linked_field = linked_field.clone();
-                    linked_field.concrete_type = None;
-                    return make_prop(
-                        typegen_context,
-                        TypeSelection::LinkedField(linked_field),
-                        mask_status,
-                        Some(concrete_type),
-                        encountered_enums,
-                        encountered_fragments,
-                        custom_scalars,
-                        runtime_imports,
-                        custom_error_import,
-                    );
-                }
+            if let TypeSelection::LinkedField(ref linked_field) = sel
+                && let Some(concrete_type) = linked_field.concrete_type
+            {
+                let mut linked_field = linked_field.clone();
+                linked_field.concrete_type = None;
+                return make_prop(
+                    typegen_context,
+                    TypeSelection::LinkedField(linked_field),
+                    mask_status,
+                    Some(concrete_type),
+                    encountered_enums,
+                    encountered_fragments,
+                    custom_scalars,
+                    runtime_imports,
+                    custom_error_import,
+                );
             }
 
             make_prop(
@@ -1605,11 +1664,15 @@ fn get_discriminated_union_ast(
 ///
 /// If this condition passes, we emit a discriminated union
 fn should_emit_discriminated_union(
+    concrete_type: &Type,
     by_concrete_type: &IndexMap<Type, Vec<TypeSelection>>,
     base_fields: &IndexMap<StringKey, TypeSelection>,
 ) -> bool {
-    !by_concrete_type.is_empty()
-        && base_fields.values().all(TypeSelection::is_typename)
+    if by_concrete_type.is_empty() || !concrete_type.is_abstract_type() {
+        return false;
+    }
+
+    base_fields.values().all(TypeSelection::is_typename)
         && (base_fields.values().any(TypeSelection::is_typename)
             || by_concrete_type
                 .values()
@@ -1755,7 +1818,7 @@ fn append_local_3d_payload(
     }
 }
 
-fn make_custom_error_import(
+pub fn make_custom_error_import(
     typegen_context: &'_ TypegenContext<'_>,
     custom_error_type: &mut Option<CustomTypeImport>,
 ) -> Result<(), std::fmt::Error> {
@@ -1766,8 +1829,7 @@ fn make_custom_error_import(
         .clone();
     if custom_error_type.is_some() && *custom_error_type != current_error_type {
         panic!(
-            "Custom error type is not consistent across fragments. This indicates a bug in Relay. current_error_type: {:?}, custom_error_type: {:?}",
-            current_error_type, custom_error_type
+            "Custom error type is not consistent across fragments. This indicates a bug in Relay. current_error_type: {current_error_type:?}, custom_error_type: {custom_error_type:?}"
         );
     } else if custom_error_type.is_some() && *custom_error_type == current_error_type {
         return Ok(());
@@ -1780,7 +1842,7 @@ fn make_custom_error_import(
     );
     Ok(())
 }
-fn make_result_type(typegen_context: &'_ TypegenContext<'_>, value: AST) -> AST {
+pub fn make_result_type(typegen_context: &'_ TypegenContext<'_>, value: AST) -> AST {
     let maybe_custom_error = &typegen_context
         .project_config
         .typegen_config
@@ -1793,7 +1855,7 @@ fn make_result_type(typegen_context: &'_ TypegenContext<'_>, value: AST) -> AST 
 
     AST::GenericType {
         outer: *RESULT_TYPE_NAME,
-        inner: vec![value, AST::ReadOnlyArray(Box::new(error_type))],
+        inner: vec![value, error_type],
     }
 }
 
@@ -1812,8 +1874,7 @@ fn make_prop(
     let optional = type_selection.is_conditional();
     if typegen_context.generating_updatable_types && optional {
         panic!(
-            "When generating types for updatable operations and fragments, we should never generate optional fields! This indicates a bug in Relay. type_selection: {:?}",
-            type_selection
+            "When generating types for updatable operations and fragments, we should never generate optional fields! This indicates a bug in Relay. type_selection: {type_selection:?}"
         );
     }
 
@@ -1830,6 +1891,7 @@ fn make_prop(
 
                 let getter_object_props = selections_to_babel(
                     typegen_context,
+                    &linked_field.node_type.inner(),
                     no_fragments.into_iter(),
                     mask_status,
                     None,
@@ -1921,6 +1983,7 @@ fn make_prop(
             } else {
                 let object_props = selections_to_babel(
                     typegen_context,
+                    &linked_field.node_type.inner(),
                     hashmap_into_values(linked_field.node_selections),
                     mask_status,
                     None,
@@ -1947,7 +2010,7 @@ fn make_prop(
                     match make_custom_error_import(typegen_context, custom_error_import) {
                         Ok(_) => {}
                         Err(e) => {
-                            panic!("Error while generating custom error type: {}", e);
+                            panic!("Error while generating custom error type: {e}");
                         }
                     }
                 }
@@ -1988,7 +2051,7 @@ fn make_prop(
                     match make_custom_error_import(typegen_context, custom_error_import) {
                         Ok(_) => {}
                         Err(e) => {
-                            panic!("Error while generating custom error type: {}", e);
+                            panic!("Error while generating custom error type: {e}");
                         }
                     }
                 }
@@ -2004,10 +2067,7 @@ fn make_prop(
                 })
             }
         }
-        _ => panic!(
-            "Unexpected TypeSelection variant in make_prop, {:?}",
-            type_selection
-        ),
+        _ => panic!("Unexpected TypeSelection variant in make_prop, {type_selection:?}"),
     }
 }
 
@@ -2089,10 +2149,9 @@ fn raw_response_make_prop(
             }
         }
         TypeSelection::RawResponseFragmentSpread(f) => Prop::Spread(SpreadProp { value: f.value }),
-        _ => panic!(
-            "Unexpected TypeSelection variant in raw_response_make_prop {:?}",
-            type_selection
-        ),
+        _ => {
+            panic!("Unexpected TypeSelection variant in raw_response_make_prop {type_selection:?}")
+        }
     }
 }
 
@@ -2315,20 +2374,19 @@ pub(crate) fn raw_response_visit_selections(
                 enclosing_linked_field_concrete_type,
                 emit_semantic_types,
             ),
-            Selection::Condition(condition) => {
-                type_selections.extend(raw_response_visit_selections(
-                    typegen_context,
-                    &condition.selections,
-                    encountered_enums,
-                    match_fields,
-                    encountered_fragments,
-                    imported_raw_response_types,
-                    runtime_imports,
-                    custom_scalars,
-                    enclosing_linked_field_concrete_type,
-                    emit_semantic_types,
-                ));
-            }
+            Selection::Condition(condition) => raw_response_visit_condition(
+                typegen_context,
+                &mut type_selections,
+                condition,
+                encountered_enums,
+                match_fields,
+                encountered_fragments,
+                imported_raw_response_types,
+                runtime_imports,
+                custom_scalars,
+                enclosing_linked_field_concrete_type,
+                emit_semantic_types,
+            ),
         }
     }
     type_selections
@@ -2526,19 +2584,13 @@ fn merge_selection(
                 );
                 TypeSelection::LinkedField(lf_a)
             } else {
-                panic!(
-                    "Invalid variants passed to merge_selection linked field a={:?} b={:?}",
-                    lf_a, b
-                )
+                panic!("Invalid variants passed to merge_selection linked field a={lf_a:?} b={b:?}")
             }
         } else if let TypeSelection::ScalarField(sf_a) = a {
             if let TypeSelection::ScalarField(_) = b {
                 TypeSelection::ScalarField(sf_a)
             } else {
-                panic!(
-                    "Invalid variants passed to merge_selection scalar field a={:?} b={:?}",
-                    sf_a, b
-                )
+                panic!("Invalid variants passed to merge_selection scalar field a={sf_a:?} b={b:?}")
             }
         } else {
             a

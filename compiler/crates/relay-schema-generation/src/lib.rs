@@ -10,19 +10,20 @@
 #![deny(clippy::all)]
 
 mod errors;
+mod find_property_lookup_resolvers;
 mod find_resolver_imports;
 
-use std::collections::hash_map::Entry;
 use std::collections::HashSet;
+use std::collections::hash_map::Entry;
 use std::path::Path;
 use std::path::PathBuf;
 use std::str::FromStr;
 
 use ::errors::try_all;
+use ::intern::Lookup;
 use ::intern::intern;
 use ::intern::string_key::Intern;
 use ::intern::string_key::StringKey;
-use ::intern::Lookup;
 use common::Diagnostic;
 use common::DiagnosticsResult;
 use common::Location;
@@ -30,17 +31,18 @@ use common::ScalarName;
 use common::SourceLocationKey;
 use common::Span;
 use common::WithLocation;
-use docblock_shared::ResolverSourceHash;
 use docblock_shared::DEPRECATED_FIELD;
-use docblock_syntax::parse_docblock;
+use docblock_shared::ResolverSourceHash;
 use docblock_syntax::DocblockAST;
 use docblock_syntax::DocblockSection;
+use docblock_syntax::parse_docblock;
 use errors::SchemaGenerationError;
 use find_resolver_imports::ImportExportVisitor;
 use find_resolver_imports::JSImportType;
 use find_resolver_imports::ModuleResolution;
 use find_resolver_imports::ModuleResolutionKey;
 use fnv::FnvBuildHasher;
+use fnv::FnvHashMap;
 use graphql_ir::FragmentDefinitionName;
 use graphql_syntax::ConstantArgument;
 use graphql_syntax::ConstantDirective;
@@ -58,6 +60,7 @@ use graphql_syntax::StringNode;
 use graphql_syntax::Token;
 use graphql_syntax::TokenKind;
 use graphql_syntax::TypeAnnotation;
+use hermes_comments::AttachedComments;
 use hermes_comments::find_nodes_after_comments;
 use hermes_estree::Declaration;
 use hermes_estree::FlowTypeAnnotation;
@@ -71,10 +74,11 @@ use hermes_estree::Range;
 use hermes_estree::SourceRange;
 use hermes_estree::TypeAlias;
 use hermes_estree::TypeAnnotationEnum;
-use hermes_parser::parse;
+use hermes_estree::Visitor;
 use hermes_parser::ParseResult;
 use hermes_parser::ParserDialect;
 use hermes_parser::ParserFlags;
+use hermes_parser::parse;
 use indexmap::IndexMap;
 use lazy_static::lazy_static;
 use relay_config::CustomType;
@@ -90,6 +94,8 @@ use relay_docblock::UnpopulatedIrField;
 use relay_docblock::WeakObjectIr;
 use rustc_hash::FxHashMap;
 use schema_extractor::SchemaExtractor;
+
+use crate::find_property_lookup_resolvers::PropertyVisitor;
 
 pub static LIVE_FLOW_TYPE_NAME: &str = "LiveState";
 
@@ -134,17 +140,27 @@ pub struct RelayResolverExtractor {
     custom_scalar_map: FnvIndexMap<CustomType, ScalarName>,
 }
 
+enum FieldDefinitionInfo {
+    ResolverFunctionInfo {
+        arguments: Option<FlowTypeAnnotation>,
+        is_live: Option<Location>,
+        root_fragment: Option<(WithLocation<FragmentDefinitionName>, Vec<Argument>)>,
+    },
+    PropertyLookupInfo {
+        // If an alias is used, this may differ from the field name
+        property_name: WithLocation<StringKey>,
+    },
+}
+
 struct UnresolvedFieldDefinition {
     entity_name: Option<WithLocation<StringKey>>,
     field_name: WithLocation<StringKey>,
     return_type: FlowTypeAnnotation,
-    arguments: Option<FlowTypeAnnotation>,
     source_hash: ResolverSourceHash,
-    is_live: Option<Location>,
     description: Option<WithLocation<StringKey>>,
     deprecated: Option<IrField>,
-    root_fragment: Option<(WithLocation<FragmentDefinitionName>, Vec<Argument>)>,
     entity_type: Option<WithLocation<StringKey>>,
+    field_info: FieldDefinitionInfo,
 }
 
 impl Default for RelayResolverExtractor {
@@ -155,14 +171,26 @@ impl Default for RelayResolverExtractor {
 
 impl RelayResolverExtractor {
     pub fn new() -> Self {
-        Self {
+        let mut self_ = Self {
             type_definitions: Default::default(),
             unresolved_field_definitions: Default::default(),
             resolved_field_definitions: vec![],
             module_resolutions: Default::default(),
             current_location: SourceLocationKey::generated(),
             custom_scalar_map: FnvIndexMap::default(),
-        }
+        };
+        self_.add_relay_runtime_flow_scalars();
+        self_
+    }
+
+    fn add_relay_runtime_flow_scalars(&mut self) {
+        self.custom_scalar_map.insert(
+            CustomType::Path(CustomTypeImport {
+                name: intern!("DataID"),
+                path: PathBuf::from_str("relay-runtime").unwrap(),
+            }),
+            ScalarName("ID".intern()),
+        );
     }
 
     pub fn set_custom_scalar_map(
@@ -170,6 +198,7 @@ impl RelayResolverExtractor {
         custom_scalar_types: &FnvIndexMap<ScalarName, CustomType>,
     ) -> DiagnosticsResult<()> {
         self.custom_scalar_map = invert_custom_scalar_map(custom_scalar_types)?;
+        self.add_relay_runtime_flow_scalars();
         Ok(())
     }
 
@@ -220,6 +249,15 @@ impl RelayResolverExtractor {
         let module_resolution = import_export_visitor.get_module_resolution(&ast)?;
 
         let attached_comments = find_nodes_after_comments(&ast, &comments);
+        let (gql_field_comments, attached_comments): (AttachedComments<'_>, AttachedComments<'_>) =
+            attached_comments
+                .into_iter()
+                .partition(|(comment, _, _, _)| comment.contains("@gqlField"));
+
+        let gql_comments =
+            FnvHashMap::from_iter(gql_field_comments.into_iter().map(
+                |(comment, comment_range, _, node_range)| (node_range, (comment, comment_range)),
+            ));
 
         let result = try_all(
             attached_comments
@@ -267,13 +305,15 @@ impl RelayResolverExtractor {
                                         entity_name,
                                         field_name: name,
                                         return_type,
-                                        arguments,
                                         source_hash,
-                                        is_live,
                                         description,
                                         deprecated,
-                                        root_fragment: None,
                                         entity_type: None,
+                                        field_info: FieldDefinitionInfo::ResolverFunctionInfo {
+                                            arguments,
+                                            is_live,
+                                            root_fragment: None,
+                                        },
                                     },
                                 )?
                             } else {
@@ -292,6 +332,25 @@ impl RelayResolverExtractor {
                             type_alias,
                         }) => {
                             let name = resolver_value.field_value.unwrap_or(field_name);
+                            let mut prop_visitor = PropertyVisitor::new(
+                                source_module_path,
+                                source_hash,
+                                name,
+                                &gql_comments,
+                            );
+                            prop_visitor.visit_flow_type_annotation(&type_alias);
+                            if !prop_visitor.errors.is_empty() {
+                                return Err(prop_visitor.errors);
+                            }
+                            let field_definitions: Vec<(
+                                UnresolvedFieldDefinition,
+                                SourceLocationKey,
+                            )> = prop_visitor
+                                .field_definitions
+                                .into_iter()
+                                .map(|def| (def, prop_visitor.location))
+                                .collect();
+
                             self.add_weak_type_definition(
                                 name,
                                 type_alias,
@@ -299,7 +358,8 @@ impl RelayResolverExtractor {
                                 source_module_path,
                                 description,
                                 false,
-                            )?
+                            )?;
+                            self.unresolved_field_definitions.extend(field_definitions);
                         }
                     }
                     Ok(())
@@ -366,27 +426,51 @@ impl RelayResolverExtractor {
                         // Special case: we attach the field to the `Query` type when there is no entity
                         WithLocation::new(field.field_name.location, intern!("Query"))
                     };
-                    let arguments = if let Some(args) = field.arguments {
-                        Some(flow_type_to_field_arguments(
-                            source_location,
-                            &self.custom_scalar_map,
-                            &args,
-                            module_resolution,
-                            &self.type_definitions,
-                        )?)
-                    } else {
-                        None
+                    let property_lookup_name = match field.field_info {
+                        FieldDefinitionInfo::PropertyLookupInfo { property_name } => {
+                            Some(property_name)
+                        }
+                        FieldDefinitionInfo::ResolverFunctionInfo { .. } => None,
                     };
-                    if let (Some(field_arguments), Some((root_fragment, fragment_arguments))) =
-                        (&arguments, &field.root_fragment)
-                    {
-                        relay_docblock::validate_fragment_arguments(
-                            source_location,
-                            field_arguments,
-                            root_fragment.location.source_location(),
-                            fragment_arguments,
-                        )?;
-                    }
+                    let (arguments, is_live, (root_fragment, fragment_arguments)) =
+                        match field.field_info {
+                            FieldDefinitionInfo::ResolverFunctionInfo {
+                                arguments,
+                                is_live,
+                                root_fragment,
+                            } => {
+                                let args = if let Some(args) = arguments {
+                                    Some(flow_type_to_field_arguments(
+                                        source_location,
+                                        &self.custom_scalar_map,
+                                        &args,
+                                        module_resolution,
+                                        &self.type_definitions,
+                                    )?)
+                                } else {
+                                    None
+                                };
+
+                                if let (
+                                    Some(field_arguments),
+                                    Some((root_fragment, fragment_arguments)),
+                                ) = (&args, &root_fragment)
+                                {
+                                    relay_docblock::validate_fragment_arguments(
+                                        source_location,
+                                        field_arguments,
+                                        root_fragment.location.source_location(),
+                                        fragment_arguments,
+                                    )?;
+                                }
+
+                                (args, is_live, root_fragment.unzip())
+                            }
+                            FieldDefinitionInfo::PropertyLookupInfo { .. } => {
+                                (None, None, (None, None))
+                            }
+                        };
+                    let live = is_live.map(|loc| UnpopulatedIrField { key_location: loc });
                     let description_node = field.description.map(|desc| StringNode {
                         token: Token {
                             span: desc.location.span(),
@@ -412,14 +496,11 @@ impl RelayResolverExtractor {
                         hack_source: None,
                         span: field.field_name.location.span(),
                     };
-                    let live = field
-                        .is_live
-                        .map(|loc| UnpopulatedIrField { key_location: loc });
-                    let (root_fragment, fragment_arguments) = field.root_fragment.unzip();
                     self.resolved_field_definitions.push(TerseRelayResolverIr {
                         field: field_definition,
                         type_,
                         root_fragment,
+                        return_fragment: None,
                         location: field.field_name.location,
                         deprecated: field.deprecated,
                         live,
@@ -429,6 +510,8 @@ impl RelayResolverExtractor {
                             semantic_non_null_levels,
                             field.field_name.location,
                         ),
+                        type_confirmed: true,
+                        property_lookup_name,
                     });
                     Ok(())
                 }),
@@ -475,8 +558,23 @@ impl RelayResolverExtractor {
                 );
                 let fragment_arguments =
                     relay_docblock::extract_fragment_arguments(&fragment_definition).transpose()?;
-                field_definition.root_fragment =
-                    Some((fragment, fragment_arguments.unwrap_or(vec![])));
+                field_definition.field_info = match field_definition.field_info {
+                    FieldDefinitionInfo::ResolverFunctionInfo {
+                        arguments,
+                        is_live,
+                        root_fragment: _,
+                    } => FieldDefinitionInfo::ResolverFunctionInfo {
+                        arguments,
+                        is_live,
+                        root_fragment: Some((fragment, fragment_arguments.unwrap_or(vec![]))),
+                    },
+                    FieldDefinitionInfo::PropertyLookupInfo { .. } => {
+                        return Err(vec![Diagnostic::error(
+                            SchemaGenerationError::ExpectedResolverFunctionWithRootFragment,
+                            entity_name.location,
+                        )]);
+                    }
+                }
             }
         }
         self.unresolved_field_definitions
@@ -509,6 +607,7 @@ impl RelayResolverExtractor {
             implements_interfaces: vec![],
             source_hash,
             semantic_non_null: None,
+            type_confirmed: true,
         };
 
         // We ignore nullable annotation since both nullable and non-nullable types are okay for
@@ -585,6 +684,7 @@ impl RelayResolverExtractor {
             location: name.location,
             implements_interfaces: vec![],
             source_hash,
+            type_confirmed: true,
         };
         let haste_module_name = Path::new(source_module_path)
             .file_stem()
@@ -607,17 +707,17 @@ impl RelayResolverExtractor {
                                 entity_name: Some(name),
                                 field_name,
                                 return_type: field_type.clone(),
-                                arguments: None,
                                 source_hash,
-                                is_live: None,
                                 description,
                                 deprecated: None,
-                                root_fragment: None,
                                 entity_type: Some(
                                     weak_object
                                         .type_name
                                         .name_with_location(weak_object.location.source_location()),
                                 ),
+                                field_info: FieldDefinitionInfo::PropertyLookupInfo {
+                                    property_name: field_name,
+                                },
                             },
                             self.current_location,
                         ));
@@ -911,7 +1011,7 @@ fn return_type_to_type_annotation(
     type_definitions: &FxHashMap<ModuleResolutionKey, DocblockIr>,
     use_semantic_non_null: bool,
 ) -> DiagnosticsResult<(TypeAnnotation, Vec<i64>)> {
-    let (return_type, mut is_optional) = schema_extractor::unwrap_nullable_type(return_type);
+    let (return_type, is_optional) = schema_extractor::unwrap_nullable_type(return_type);
     let mut semantic_non_null_levels: Vec<i64> = vec![];
 
     let location = to_location(source_location, return_type);
@@ -934,7 +1034,7 @@ fn return_type_to_type_annotation(
                     let custom_scalar = custom_scalar_map.get(&scalar_key);
 
                     let graphql_typename = match custom_scalar {
-                        Some(scalar_name) => identifier.map(|_| scalar_name.0), // map identifer to keep the location
+                        Some(scalar_name) => identifier.map(|_| scalar_name.0), // map identifier to keep the location
                         None => {
                             // If there is no custom scalar, expect that the Flow type is imported
                             let module_key = module_key_opt.ok_or_else(|| {
@@ -978,7 +1078,7 @@ fn return_type_to_type_annotation(
                 Some(type_parameters) if type_parameters.params.len() == 1 => {
                     let identifier_name = identifier.item.lookup();
                     match identifier_name {
-                        "Array" | "$ReadOnlyArray" => {
+                        "Array" | "$ReadOnlyArray" | "ReadonlyArray" => {
                             let param = &type_parameters.params[0];
                             let (type_annotation, inner_semantic_non_null_levels) =
                                 return_type_to_type_annotation(
@@ -1026,20 +1126,16 @@ fn return_type_to_type_annotation(
                                 )]);
                             }
                         }
-                        "RelayResolverValue" => {
-                            // Special case for `RelayResolverValue`, it is always optional
-                            is_optional = true;
-                            TypeAnnotation::Named(NamedTypeAnnotation {
-                                name: Identifier {
+                        "RelayResolverValue" => TypeAnnotation::Named(NamedTypeAnnotation {
+                            name: Identifier {
+                                span: location.span(),
+                                token: Token {
                                     span: location.span(),
-                                    token: Token {
-                                        span: location.span(),
-                                        kind: TokenKind::Identifier,
-                                    },
-                                    value: intern!("RelayResolverValue"),
+                                    kind: TokenKind::Identifier,
                                 },
-                            })
-                        }
+                                value: intern!("RelayResolverValue"),
+                            },
+                        }),
                         _ => {
                             return Err(vec![Diagnostic::error(
                                 SchemaGenerationError::UnSupportedGeneric {
@@ -1178,6 +1274,7 @@ fn flow_type_to_field_arguments(
                 type_: type_annotation,
                 default_value: None,
                 directives: vec![],
+                description: None,
                 span: prop_span,
             };
             items.push(arg);
@@ -1271,10 +1368,10 @@ fn invert_custom_scalar_map(
 ) -> DiagnosticsResult<FnvIndexMap<CustomType, ScalarName>> {
     let mut custom_scalar_map = FnvIndexMap::default();
     for (graphql_scalar, flow_type) in custom_scalar_types.iter() {
-        if let CustomType::Name(scalar) = flow_type {
-            if FLOW_PRIMATIVES.contains(scalar.lookup()) {
-                continue;
-            }
+        if let CustomType::Name(scalar) = flow_type
+            && FLOW_PRIMATIVES.contains(scalar.lookup())
+        {
+            continue;
         }
         if custom_scalar_map.contains_key(flow_type) {
             // Multiple custom GraphQL scalars map to one Flow type

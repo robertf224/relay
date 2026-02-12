@@ -53,6 +53,7 @@ Field(
                 item: "Query",
             },
             root_fragment: None,
+            return_fragment: None,
             deprecated: None,
             semantic_non_null: None,
             live: None,
@@ -61,6 +62,8 @@ Field(
             source_hash: ResolverSourceHash(
                 "38a7a82b77c64472c7bf872babfeece3",
             ),
+            type_confirmed: true,
+            property_lookup_name: None,
         },
     ),
 )

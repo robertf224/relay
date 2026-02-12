@@ -84,6 +84,7 @@ describe('ReactRelayFragmentContainer with fragment ownership', () => {
       ) {
         node(id: $id) {
           ...ReactRelayFragmentContainerWithFragmentOwnershipTestUserFragment
+            @dangerously_unaliased_fixme
         }
       }
     `;
@@ -94,6 +95,7 @@ describe('ReactRelayFragmentContainer with fragment ownership', () => {
       ) {
         node(id: $id) {
           ...ReactRelayFragmentContainerWithFragmentOwnershipTestUserFragment
+            @dangerously_unaliased_fixme
             @arguments(cond: $condGlobal)
         }
       }
@@ -206,10 +208,8 @@ describe('ReactRelayFragmentContainer with fragment ownership', () => {
         },
         __fragmentOwner: ownerUser1.request,
       },
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       isMissingData: false,
       seenRecords: expect.any(Object),
@@ -254,7 +254,6 @@ describe('ReactRelayFragmentContainer with fragment ownership', () => {
           },
           __fragmentOwner: ownerUser1.request,
         },
-        relayResolverErrors: [],
         seenRecords: {},
         isMissingData: false,
       }),
@@ -336,10 +335,8 @@ describe('ReactRelayFragmentContainer with fragment ownership', () => {
         },
         __fragmentOwner: ownerUser2.request,
       },
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       isMissingData: false,
       seenRecords: expect.any(Object),
@@ -408,10 +405,8 @@ describe('ReactRelayFragmentContainer with fragment ownership', () => {
         },
         __fragmentOwner: ownerUser1WithCondVar.request,
       },
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       isMissingData: false,
       seenRecords: expect.any(Object),

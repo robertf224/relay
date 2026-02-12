@@ -7,8 +7,8 @@
 
 use core::panic;
 use std::borrow::Cow;
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::ffi::OsStr;
 use std::path::Component;
 use std::path::Path;
@@ -21,13 +21,13 @@ use rayon::iter::IntoParallelRefIterator;
 use relay_config::ProjectName;
 use relay_typegen::TypegenLanguage;
 
-use super::file_filter::FileFilter;
 use super::File;
 use super::FileGroup;
+use super::file_filter::FileFilter;
+use crate::FileSourceResult;
 use crate::compiler_state::ProjectSet;
 use crate::config::Config;
 use crate::config::SchemaLocation;
-use crate::FileSourceResult;
 
 /// The watchman query returns a list of files, but for the compiler we
 /// need to categorize these files into multiple groups of files like
@@ -166,8 +166,8 @@ impl FileCategorizer {
 
         let mut extensions_map: HashMap<PathBuf, ProjectSet> = Default::default();
         for (&project_name, project_config) in &config.projects {
-            for extension_dir in &project_config.schema_extensions {
-                match extensions_map.entry(extension_dir.clone()) {
+            for extension_path in &project_config.schema_extensions {
+                match extensions_map.entry(extension_path.clone()) {
                     Entry::Vacant(entry) => {
                         entry.insert(ProjectSet::of(project_name));
                     }
@@ -283,8 +283,7 @@ impl FileCategorizer {
                     if project_set.has_multiple_projects() {
                         Err(Cow::Owned(format!(
                             "Overlapping input sources are incompatible with relative generated \
-                        directories. Got file in a relative generated directory with source set {:?}.",
-                            project_set,
+                        directories. Got file in a relative generated directory with source set {project_set:?}.",
                         )))
                     } else {
                         let project_name = project_set.into_iter().next().unwrap();
@@ -330,14 +329,11 @@ impl FileCategorizer {
         path: &Path,
     ) -> bool {
         for project_name in project_set.iter() {
-            if let Some(language) = self.source_language.get(project_name) {
-                if !is_valid_source_code_extension(language, extension) {
-                    warn!(
-                        "Unexpected file `{:?}` for language `{:?}`.",
-                        path, language
-                    );
-                    return false;
-                }
+            if let Some(language) = self.source_language.get(project_name)
+                && !is_valid_source_code_extension(language, extension)
+            {
+                warn!("Unexpected file `{path:?}` for language `{language:?}`.");
+                return false;
             }
         }
         true

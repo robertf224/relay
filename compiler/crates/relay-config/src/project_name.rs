@@ -7,19 +7,27 @@
 
 use std::fmt;
 
+use intern::Lookup;
 use intern::string_key::Intern;
 use intern::string_key::StringKey;
-use intern::Lookup;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, JsonSchema, Ord, PartialOrd)]
+/// Represents the name of a project in the Relay configuration.
+#[derive(
+    Debug, Clone, Copy, Hash, PartialEq, Eq, JsonSchema, Ord, PartialOrd, Default
+)]
 #[schemars(untagged)]
 pub enum ProjectName {
+    /// No project name is specified.
+    #[default]
     Default,
+    /// A project name.
+    ///
+    /// This should match one the keys in the `projects` map in the Relay compiler config.
     Named(StringKey),
 }
 
@@ -29,20 +37,14 @@ impl ProjectName {
         object_name: StringKey,
         field_name: StringKey,
     ) -> String {
-        format!("{}__{}", object_name, field_name)
-    }
-}
-
-impl Default for ProjectName {
-    fn default() -> Self {
-        Self::Default
+        format!("{object_name}__{field_name}")
     }
 }
 
 impl fmt::Display for ProjectName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Self::Named(value) = self {
-            write!(f, "{}", value)
+            write!(f, "{value}")
         } else {
             write!(f, "default")
         }

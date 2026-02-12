@@ -35,7 +35,7 @@ export type LoaderFn<TQuery: OperationType> = (
   options?: UseQueryLoaderLoadQueryOptions,
 ) => void;
 
-export type UseQueryLoaderLoadQueryOptions = $ReadOnly<{
+export type UseQueryLoaderLoadQueryOptions = Readonly<{
   ...LoadQueryOptions,
   +__environment?: ?IEnvironment,
 }>;
@@ -46,7 +46,9 @@ export type UseQueryLoaderLoadQueryOptions = $ReadOnly<{
 export type NullQueryReference = {
   kind: 'NullQueryReference',
 };
-const initialNullQueryReferenceState = {kind: 'NullQueryReference'};
+const initialNullQueryReferenceState: NullQueryReference = {
+  kind: 'NullQueryReference',
+};
 
 function requestIsLiveQuery<
   TVariables: Variables,
@@ -55,7 +57,7 @@ function requestIsLiveQuery<
   TQuery: OperationType = {
     response: TData,
     variables: TVariables,
-    rawResponse?: $NonMaybeType<TRawResponse>,
+    rawResponse?: NonNullable<TRawResponse>,
   },
 >(
   preloadableRequest:
@@ -77,7 +79,7 @@ export type UseQueryLoaderHookReturnType<
   ?PreloadedQuery<{
     response: TData,
     variables: TVariables,
-    rawResponse?: $NonMaybeType<TRawResponse>,
+    rawResponse?: NonNullable<TRawResponse>,
   }>,
   (variables: TVariables, options?: UseQueryLoaderLoadQueryOptions) => void,
   () => void,
@@ -100,7 +102,7 @@ declare function useQueryLoader<
   initialQueryReference: ?PreloadedQuery<{
     response: TData,
     variables: TVariables,
-    rawResponse?: $NonMaybeType<TRawResponse>,
+    rawResponse?: NonNullable<TRawResponse>,
   }>,
 ): UseQueryLoaderHookReturnType<TVariables, TData>;
 
@@ -114,17 +116,19 @@ hook useQueryLoader<TVariables: Variables, TData, TRawResponse: ?{...} = void>(
   initialQueryReference?: ?PreloadedQuery<{
     response: TData,
     variables: TVariables,
-    rawResponse?: $NonMaybeType<TRawResponse>,
+    rawResponse?: NonNullable<TRawResponse>,
   }>,
 ): UseQueryLoaderHookReturnType<TVariables, TData> {
   if (RelayFeatureFlags.ENABLE_ACTIVITY_COMPATIBILITY) {
     // $FlowFixMe[react-rule-hook] - the condition is static
+    // $FlowFixMe[react-rule-hook-conditional]
     return useQueryLoader_EXPERIMENTAL(
       preloadableRequest,
       initialQueryReference,
     );
   }
   // $FlowFixMe[react-rule-hook] - the condition is static
+  // $FlowFixMe[react-rule-hook-conditional]
   return useQueryLoader_CURRENT(preloadableRequest, initialQueryReference);
 }
 
@@ -137,13 +141,13 @@ hook useQueryLoader_CURRENT<
   initialQueryReference?: ?PreloadedQuery<{
     response: TData,
     variables: TVariables,
-    rawResponse?: $NonMaybeType<TRawResponse>,
+    rawResponse?: NonNullable<TRawResponse>,
   }>,
 ): UseQueryLoaderHookReturnType<TVariables, TData> {
   type QueryType = {
     response: TData,
     variables: TVariables,
-    rawResponse?: $NonMaybeType<TRawResponse>,
+    rawResponse?: NonNullable<TRawResponse>,
   };
 
   /**
@@ -209,9 +213,9 @@ hook useQueryLoader_CURRENT<
       const mergedOptions: ?UseQueryLoaderLoadQueryOptions =
         options != null && options.hasOwnProperty('__environment')
           ? {
+              __nameForWarning: options.__nameForWarning,
               fetchPolicy: options.fetchPolicy,
               networkCacheConfig: options.networkCacheConfig,
-              __nameForWarning: options.__nameForWarning,
             }
           : options;
       if (isMountedRef.current) {
@@ -219,7 +223,7 @@ hook useQueryLoader_CURRENT<
           options?.__environment ?? environment,
           preloadableRequest,
           variables,
-          (mergedOptions: $FlowFixMe),
+          mergedOptions as $FlowFixMe,
         );
         undisposedQueryReferencesRef.current.add(updatedQueryReference);
         setQueryReference(updatedQueryReference);
@@ -232,7 +236,7 @@ hook useQueryLoader_CURRENT<
   useEffect(() => {
     return () => {
       // Attempt to detect if the component was
-      // hidden (by Offscreen API), or fast refresh occured;
+      // hidden (by Offscreen API), or fast refresh occurred;
       // Only in these situations would the effect cleanup
       // for "unmounting" run multiple times, so if
       // we are ever able to read this ref with a value

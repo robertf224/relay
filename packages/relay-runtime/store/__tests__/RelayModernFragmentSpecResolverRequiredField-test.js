@@ -54,6 +54,7 @@ describe('RelayModernFragmentSpecResolver', () => {
       ) {
         node(id: $id) {
           ...RelayModernFragmentSpecResolverRequiredFieldTestUserFragment
+            @dangerously_unaliased_fixme
         }
       }
     `;
@@ -126,6 +127,7 @@ describe('RelayModernFragmentSpecResolver', () => {
       fieldPath: 'name',
       kind: 'missing_required_field.throw',
       owner: 'RelayModernFragmentSpecResolverRequiredFieldTestUserFragment',
+      handled: false,
     });
   });
 });

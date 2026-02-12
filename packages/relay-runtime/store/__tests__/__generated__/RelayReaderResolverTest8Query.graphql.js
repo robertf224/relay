@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<8cd38d1dfe49beb78e0b491ae51cc2fa>>
+ * @generated SignedSource<<6d73ad12ce6c374b97014dda01d09b50>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -31,7 +31,7 @@ import type { TestResolverContextType } from "../../../mutations/__tests__/TestR
 export type RelayReaderResolverTest8Query$variables = {||};
 export type RelayReaderResolverTest8Query$data = {|
   +me: ?{|
-    +name_passthrough: $NonMaybeType<?string>,
+    +name_passthrough: NonNullable<?string>,
   |},
 |};
 export type RelayReaderResolverTest8Query = {|
@@ -67,11 +67,10 @@ var node/*: ConcreteRequest*/ = {
               },
               "kind": "RelayResolver",
               "name": "name_passthrough",
-              "resolverModule": require('./../resolvers/UserNamePassthroughResolver').name_passthrough,
+              "resolverModule": require('../resolvers/UserNamePassthroughResolver').name_passthrough,
               "path": "me.name_passthrough"
             },
-            "action": "NONE",
-            "path": "me.name_passthrough"
+            "action": "NONE"
           }
         ],
         "storageKey": null

@@ -16,20 +16,14 @@ const {
 } = require('../RelayModernOperationDescriptor');
 const {read} = require('../RelayReader');
 const RelayRecordSource = require('../RelayRecordSource');
-const {
-  RelayFeatureFlags,
-  createReaderSelector,
-  getPluralSelector,
-} = require('relay-runtime');
+const {createReaderSelector, getPluralSelector} = require('relay-runtime');
 const {
   LiveResolverCache,
-} = require('relay-runtime/store/experimental-live-resolvers/LiveResolverCache');
-const LiveResolverStore = require('relay-runtime/store/experimental-live-resolvers/LiveResolverStore');
-
-beforeEach(() => {
-  RelayFeatureFlags.ENABLE_FIELD_ERROR_HANDLING_CATCH_DIRECTIVE = false;
-  RelayFeatureFlags.ENABLE_FIELD_ERROR_HANDLING_THROW_BY_DEFAULT = false;
-});
+} = require('relay-runtime/store/live-resolvers/LiveResolverCache');
+const RelayModernStore = require('relay-runtime/store/RelayModernStore');
+const {
+  RELAY_READ_TIME_RESOLVER_KEY_PREFIX,
+} = require('relay-runtime/store/RelayStoreUtils');
 
 describe('RelayReader @required', () => {
   it('bubbles @required(action: LOG) scalars up to LinkedField', () => {
@@ -56,7 +50,7 @@ describe('RelayReader @required', () => {
       }
     `;
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: null});
   });
 
@@ -91,7 +85,7 @@ describe('RelayReader @required', () => {
       }
     `;
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: {requiredFields: null}});
   });
 
@@ -126,7 +120,7 @@ describe('RelayReader @required', () => {
       }
     `;
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: {requiredFields: null}});
   });
 
@@ -152,9 +146,9 @@ describe('RelayReader @required', () => {
       }
     `;
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data, missingRequiredFields} = read(source, operation.fragment);
+    const {data, fieldErrors} = read(source, operation.fragment, null);
     expect(data).toEqual(null);
-    expect(missingRequiredFields.field.path).toBe('me.lastName');
+    expect(fieldErrors[0].fieldPath).toBe('me.lastName');
   });
 
   it('bubbles @required(action: LOG) scalars up to LinkedField even if subsequent fields are not unexpectedly null', () => {
@@ -181,7 +175,7 @@ describe('RelayReader @required', () => {
       }
     `;
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: null});
   });
 
@@ -214,7 +208,7 @@ describe('RelayReader @required', () => {
       }
     `;
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: {backgroundImage: null}});
     expect(data).toMatchInlineSnapshot(`
       Object {
@@ -254,7 +248,7 @@ describe('RelayReader @required', () => {
       }
     `;
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: null});
   });
 
@@ -280,7 +274,7 @@ describe('RelayReader @required', () => {
       }
     `;
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toBeNull();
   });
 
@@ -324,7 +318,7 @@ describe('RelayReader @required', () => {
     `;
 
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({
       me: {
         screennames: [{name: 'neo', service: 'IRC'}, null],
@@ -355,7 +349,7 @@ describe('RelayReader @required', () => {
     `;
 
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: null});
   });
 
@@ -398,7 +392,7 @@ describe('RelayReader @required', () => {
       }
     `;
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({
       me: {
         screennames: [{name: 'neo', service: 'IRC'}, null],
@@ -430,7 +424,7 @@ describe('RelayReader @required', () => {
       }
     `;
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({viewer: null});
   });
 
@@ -459,7 +453,7 @@ describe('RelayReader @required', () => {
     `;
 
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({maybeNodeInterface: null});
   });
 
@@ -490,7 +484,7 @@ describe('RelayReader @required', () => {
     `;
 
     const operation = createOperationDescriptor(FooQuery, {id: '1'});
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({maybeNodeInterface: {name: 'I am not a node'}});
   });
 
@@ -520,7 +514,7 @@ describe('RelayReader @required', () => {
       id: '1',
       skip: false,
     });
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: null});
   });
 
@@ -550,7 +544,7 @@ describe('RelayReader @required', () => {
       id: '1',
       include: true,
     });
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: null});
   });
 
@@ -582,7 +576,7 @@ describe('RelayReader @required', () => {
       id: '1',
       include: false,
     });
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: {name: 'Zucc'}});
   });
 
@@ -614,7 +608,7 @@ describe('RelayReader @required', () => {
       id: '1',
       skip: true,
     });
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: {name: 'Zucc'}});
   });
 
@@ -643,7 +637,7 @@ describe('RelayReader @required', () => {
     const operation = createOperationDescriptor(FooQuery, {
       id: '1',
     });
-    const {data} = read(source, operation.fragment);
+    const {data} = read(source, operation.fragment, null);
     expect(data).toEqual({me: null});
   });
 
@@ -787,7 +781,7 @@ describe('RelayReader @required', () => {
       }
     `;
     const operation = createOperationDescriptor(UserQuery, {});
-    const {data: queryData} = read(source, operation.fragment);
+    const {data: queryData} = read(source, operation.fragment, null);
 
     expect(queryData).toMatchObject({me: {firstName: 'Alice'}});
 
@@ -876,13 +870,6 @@ describe('RelayReader @required', () => {
   });
 
   describe('client edge with @required', () => {
-    beforeEach(() => {
-      RelayFeatureFlags.ENABLE_RELAY_RESOLVERS = true;
-    });
-    afterEach(() => {
-      RelayFeatureFlags.ENABLE_RELAY_RESOLVERS = false;
-    });
-
     describe('when CATCH is enabled', () => {
       test('caught missing required field error when action:THROW under a @catch', () => {
         const source = RelayRecordSource.create({
@@ -906,12 +893,13 @@ describe('RelayReader @required', () => {
             }
           }
         `;
-        const store = new LiveResolverStore(source);
+        const store = new RelayModernStore(source);
         const operation = createOperationDescriptor(FooQuery, {});
         const resolverCache = new LiveResolverCache(() => source, store);
-        const {data, missingRequiredFields, errorResponseFields} = read(
+        const {data, fieldErrors} = read(
           source,
           operation.fragment,
+          null,
           resolverCache,
         );
         expect(data).toEqual({
@@ -925,9 +913,15 @@ describe('RelayReader @required', () => {
             ok: false,
           },
         });
-        // these are null because the field with the required error was caught
-        expect(errorResponseFields).toBeNull();
-        expect(missingRequiredFields).toBeNull();
+        // these are "handled" because the field with the required error was caught
+        expect(fieldErrors).toEqual([
+          {
+            fieldPath: 'me.client_object',
+            handled: true,
+            kind: 'missing_required_field.throw',
+            owner: 'RelayReaderRequiredFieldsTest29Query',
+          },
+        ]);
       });
     });
 
@@ -953,21 +947,23 @@ describe('RelayReader @required', () => {
           }
         }
       `;
-      const store = new LiveResolverStore(source);
+      const store = new RelayModernStore(source);
       const operation = createOperationDescriptor(FooQuery, {});
       const resolverCache = new LiveResolverCache(() => source, store);
-      const {missingRequiredFields} = read(
+      const {fieldErrors} = read(
         source,
         operation.fragment,
+        null,
         resolverCache,
       );
-      expect(missingRequiredFields).toEqual({
-        action: 'THROW',
-        field: {
+      expect(fieldErrors).toEqual([
+        {
+          fieldPath: 'me.client_object',
+          kind: 'missing_required_field.throw',
           owner: 'RelayReaderRequiredFieldsTest25Query',
-          path: 'me.client_object',
+          handled: false,
         },
-      });
+      ]);
     });
 
     test('does not throw when required field is present', () => {
@@ -998,16 +994,17 @@ describe('RelayReader @required', () => {
         }
       `;
 
-      const store = new LiveResolverStore(source);
+      const store = new RelayModernStore(source);
       const operation = createOperationDescriptor(FooQuery, {});
       const resolverCache = new LiveResolverCache(() => source, store);
-      const {data, missingRequiredFields} = read(
+      const {data, fieldErrors} = read(
         source,
         operation.fragment,
+        null,
         resolverCache,
       );
       expect(data).toEqual({me: {astrological_sign: {name: 'Pisces'}}});
-      expect(missingRequiredFields).toBe(null);
+      expect(fieldErrors).toBe(null);
     });
 
     test('does not throw when required plural field is present', () => {
@@ -1031,16 +1028,17 @@ describe('RelayReader @required', () => {
         }
       `;
 
-      const store = new LiveResolverStore(source);
+      const store = new RelayModernStore(source);
       const operation = createOperationDescriptor(FooQuery, {});
       const resolverCache = new LiveResolverCache(() => source, store);
-      const {data, missingRequiredFields} = read(
+      const {data, fieldErrors} = read(
         source,
         operation.fragment,
+        null,
         resolverCache,
       );
       expect(data.all_astrological_signs.length).toBe(12);
-      expect(missingRequiredFields).toBe(null);
+      expect(fieldErrors).toBe(null);
     });
 
     test('does not throw when @live required field is suspended', () => {
@@ -1059,16 +1057,13 @@ describe('RelayReader @required', () => {
           }
         }
       `;
-      const store = new LiveResolverStore(source);
+      const store = new RelayModernStore(source);
       const operation = createOperationDescriptor(FooQuery, {});
       const resolverCache = new LiveResolverCache(() => source, store);
-      const snapshot = read(source, operation.fragment, resolverCache);
-      expect(snapshot.missingRequiredFields).toEqual(null);
+      const snapshot = read(source, operation.fragment, null, resolverCache);
+      expect(snapshot.fieldErrors).toEqual(null);
       expect(snapshot.missingLiveResolverFields).toEqual([
-        {
-          path: 'RelayReaderRequiredFieldsTest28Query.live_user_resolver_always_suspend',
-          liveStateID: 'client:root:live_user_resolver_always_suspend',
-        },
+        `client:root:${RELAY_READ_TIME_RESOLVER_KEY_PREFIX}live_user_resolver_always_suspend`,
       ]);
     });
   });

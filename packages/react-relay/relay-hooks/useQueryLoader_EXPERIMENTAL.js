@@ -35,7 +35,9 @@ const {
 } = require('react');
 const {getRequest} = require('relay-runtime');
 
-const initialNullQueryReferenceState = {kind: 'NullQueryReference'};
+const initialNullQueryReferenceState: NullQueryReference = {
+  kind: 'NullQueryReference',
+};
 
 function requestIsLiveQuery<
   TVariables: Variables,
@@ -44,7 +46,7 @@ function requestIsLiveQuery<
   TQuery: OperationType = {
     response: TData,
     variables: TVariables,
-    rawResponse?: $NonMaybeType<TRawResponse>,
+    rawResponse?: NonNullable<TRawResponse>,
   },
 >(
   preloadableRequest:
@@ -69,13 +71,13 @@ hook useQueryLoader_EXPERIMENTAL<
   initialQueryReference?: ?PreloadedQuery<{
     response: TData,
     variables: TVariables,
-    rawResponse?: $NonMaybeType<TRawResponse>,
+    rawResponse?: NonNullable<TRawResponse>,
   }>,
 ): UseQueryLoaderHookReturnType<TVariables, TData> {
   type QueryType = {
     response: TData,
     variables: TVariables,
-    rawResponse?: $NonMaybeType<TRawResponse>,
+    rawResponse?: NonNullable<TRawResponse>,
   };
 
   /**
@@ -149,16 +151,16 @@ hook useQueryLoader_EXPERIMENTAL<
       const mergedOptions: ?UseQueryLoaderLoadQueryOptions =
         options != null && options.hasOwnProperty('__environment')
           ? {
+              __nameForWarning: options.__nameForWarning,
               fetchPolicy: options.fetchPolicy,
               networkCacheConfig: options.networkCacheConfig,
-              __nameForWarning: options.__nameForWarning,
             }
           : options;
       const updatedQueryReference = loadQuery(
         options?.__environment ?? environment,
         preloadableRequest,
         variables,
-        (mergedOptions: $FlowFixMe),
+        mergedOptions as $FlowFixMe,
       );
       undisposedQueryReferencesRef.current?.add(updatedQueryReference);
       setQueryReference(updatedQueryReference);

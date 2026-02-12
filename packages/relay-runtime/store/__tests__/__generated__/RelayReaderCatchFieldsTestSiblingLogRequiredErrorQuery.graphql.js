@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<63df1af01551ec1d47ee7c65c51bdc0f>>
+ * @generated SignedSource<<a8d67a61e39c86323f5596bf1fe8ed1b>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -26,7 +26,7 @@ export type RelayReaderCatchFieldsTestSiblingLogRequiredErrorQuery$data = {|
   |},
   +me: Result<?{|
     +firstName: string,
-  |}, $ReadOnlyArray<mixed>>,
+  |}, unknown>,
 |};
 export type RelayReaderCatchFieldsTestSiblingLogRequiredErrorQuery = {|
   response: RelayReaderCatchFieldsTestSiblingLogRequiredErrorQuery$data,
@@ -74,8 +74,7 @@ return {
           {
             "kind": "RequiredField",
             "field": (v0/*: any*/),
-            "action": "LOG",
-            "path": "alsoMe.lastName"
+            "action": "LOG"
           }
         ],
         "storageKey": null
@@ -93,14 +92,12 @@ return {
             {
               "kind": "RequiredField",
               "field": (v1/*: any*/),
-              "action": "THROW",
-              "path": "me.firstName"
+              "action": "THROW"
             }
           ],
           "storageKey": null
         },
-        "to": "RESULT",
-        "path": "me"
+        "to": "RESULT"
       }
     ],
     "type": "Query",

@@ -47,6 +47,9 @@ fragment nestedAbstractTypeSelectionOnInlineFragmentWithoutTypeFragment on Cat {
           #     live: false,
           #     output_type_info: Legacy,
           #     fragment_data_injection_mode: None,
+          #     type_confirmed: false,
+          #     resolver_type: ResolverModule,
+          #     return_fragment: None,
           # }
           
         }
@@ -67,6 +70,9 @@ fragment nestedAbstractTypeSelectionOnInlineFragmentWithoutTypeFragment on Cat {
       #     live: false,
       #     output_type_info: Legacy,
       #     fragment_data_injection_mode: None,
+      #     type_confirmed: false,
+      #     resolver_type: ResolverModule,
+      #     return_fragment: None,
       # }
       
     }

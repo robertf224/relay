@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<ddf23184657211d537bc849cd5a4f187>>
+ * @generated SignedSource<<ce7f34eedf48b3af5e4f5abba0901b24>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -28,10 +28,10 @@ import type { TestResolverContextType } from "../../../relay-runtime/mutations/_
   id: ErrorModel__id$data['id'],
   args: void,
   context: TestResolverContextType,
-) => mixed);
+) => unknown);
 declare export opaque type ErrorModel____relay_model_instance$fragmentType: FragmentType;
 export type ErrorModel____relay_model_instance$data = {|
-  +__relay_model_instance: $NonMaybeType<ReturnType<typeof errorModelRelayModelInstanceResolverType>>,
+  +__relay_model_instance: NonNullable<ReturnType<typeof errorModelRelayModelInstanceResolverType>>,
   +$fragmentType: ErrorModel____relay_model_instance$fragmentType,
 |};
 export type ErrorModel____relay_model_instance$key = {
@@ -57,7 +57,7 @@ var node/*: ReaderFragment*/ = {
       },
       "kind": "RelayResolver",
       "name": "__relay_model_instance",
-      "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./ErrorModel__id.graphql'), require('./../RelayResolverNullableModelClientEdge-test').ErrorModel, 'id', true),
+      "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./ErrorModel__id.graphql'), require('../RelayResolverNullableModelClientEdge-test').ErrorModel, 'id', true),
       "path": "__relay_model_instance"
     }
   ],

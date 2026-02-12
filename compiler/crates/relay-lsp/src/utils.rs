@@ -14,26 +14,26 @@ use common::TextSource;
 use dashmap::DashMap;
 use docblock_syntax::parse_docblock;
 use extract_graphql::JavaScriptSourceFeature;
-use graphql_syntax::parse_executable_with_error_recovery_and_parser_features;
 use graphql_syntax::ExecutableDefinition;
 use graphql_syntax::GraphQLSource;
 use graphql_syntax::ParserFeatures;
+use graphql_syntax::parse_executable_with_error_recovery_and_parser_features;
 use intern::string_key::StringKey;
 use log::debug;
 use lsp_types::Position;
 use lsp_types::TextDocumentPositionParams;
 use lsp_types::Url;
-use relay_compiler::config::Config;
-use relay_compiler::get_parser_features;
 use relay_compiler::FileCategorizer;
 use relay_compiler::FileGroup;
 use relay_compiler::ProjectConfig;
-use relay_docblock::parse_docblock_ast;
+use relay_compiler::config::Config;
+use relay_compiler::get_parser_features;
 use relay_docblock::ParseOptions;
+use relay_docblock::parse_docblock_ast;
 
+use crate::Feature;
 use crate::lsp_runtime_error::LSPRuntimeError;
 use crate::lsp_runtime_error::LSPRuntimeResult;
-use crate::Feature;
 
 pub fn is_file_uri_in_dir(root_dir: PathBuf, file_uri: &Url) -> bool {
     let file_path_result = file_uri.to_file_path();
@@ -86,20 +86,18 @@ pub fn get_file_group_from_uri(
     config: &Config,
 ) -> LSPRuntimeResult<FileGroup> {
     let absolute_file_path = url.to_file_path().map_err(|_| {
-        LSPRuntimeError::UnexpectedError(format!("Unable to convert URL to file path: {:?}", url))
+        LSPRuntimeError::UnexpectedError(format!("Unable to convert URL to file path: {url:?}"))
     })?;
 
     let file_path = absolute_file_path.strip_prefix(root_dir).map_err(|_e| {
         LSPRuntimeError::UnexpectedError(format!(
-            "Failed to strip prefix {:?} from {:?}",
-            root_dir, absolute_file_path
+            "Failed to strip prefix {root_dir:?} from {absolute_file_path:?}"
         ))
     })?;
 
     file_categorizer.categorize(file_path, config).map_err(|_| {
         LSPRuntimeError::UnexpectedError(format!(
-            "Unable to categorize the file correctly: {:?}",
-            file_path
+            "Unable to categorize the file correctly: {file_path:?}"
         ))
     })
 }
@@ -192,7 +190,7 @@ pub fn extract_feature_from_text(
             // we find the position within the document. Note that the GraphQLSource will
             // already be updated *with the characters that triggered the completion request*
             // since the change event fires before completion.
-            debug!("position_span: {:?}", position_span);
+            debug!("position_span: {position_span:?}");
 
             Ok((
                 Feature::ExecutableDocument(document),
@@ -221,6 +219,9 @@ pub fn extract_feature_from_text(
                             allow_resolver_non_nullable_return_type: &project_config
                                 .feature_flags
                                 .allow_resolver_non_nullable_return_type,
+                            enable_legacy_verbose_resolver_syntax: &project_config
+                                .feature_flags
+                                .enable_legacy_verbose_resolver_syntax,
                         },
                     )
                 })

@@ -62,7 +62,9 @@ beforeEach(() => {
         node(id: $id) {
           __typename
           ...FragmentResourceSemanticNonNullTestFragment1
+            @dangerously_unaliased_fixme
           ...FragmentResourceSemanticNonNullTestFragment2
+            @dangerously_unaliased_fixme
         }
       }
     `,
@@ -89,7 +91,7 @@ test('Throws if a field has error with explicit error handling enabled', () => {
       componentDisplayName,
     );
   }).toThrowError(
-    'Relay: Unexpected response payload - this object includes an errors property in which you can access the underlying errors',
+    'Relay: Unexpected response payload - check server logs for details.',
   );
 });
 

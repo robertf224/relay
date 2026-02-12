@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<11c5e532b753031b0c168cce57b844a7>>
+ * @generated SignedSource<<4bc234d8b502f436f97c5668aaef6281>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -20,7 +20,7 @@
 import type { ConcreteRequest, Query } from 'relay-runtime';
 import type { Result } from "relay-runtime";
 export type RelayReaderRelayErrorHandlingTest3Query$variables = {|
-  size?: ?$ReadOnlyArray<?number>,
+  size?: ?ReadonlyArray<?number>,
 |};
 export type RelayReaderRelayErrorHandlingTest3Query$data = {|
   +me: Result<?{|
@@ -28,7 +28,7 @@ export type RelayReaderRelayErrorHandlingTest3Query$data = {|
     +profilePicture: ?{|
       +uri: ?string,
     |},
-  |}, $ReadOnlyArray<mixed>>,
+  |}, unknown>,
 |};
 export type RelayReaderRelayErrorHandlingTest3Query = {|
   response: RelayReaderRelayErrorHandlingTest3Query$data,
@@ -97,8 +97,7 @@ return {
           ],
           "storageKey": null
         },
-        "to": "RESULT",
-        "path": "me"
+        "to": "RESULT"
       }
     ],
     "type": "Query",

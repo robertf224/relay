@@ -18,6 +18,7 @@ import type {
 } from './__generated__/loadQueryTestQuery.graphql';
 import type {
   CacheConfig,
+  INetwork,
   LogRequestInfoFunction,
   Query,
   RequestParameters,
@@ -55,8 +56,8 @@ describe('loadQuery', () => {
 
   // Only queries with an ID are preloadable
   const ID = '12345';
-  (query.params: $FlowFixMe).id = ID;
-  (query.params: $FlowFixMe).cacheID = ID;
+  (query.params as $FlowFixMe).id = ID;
+  (query.params as $FlowFixMe).cacheID = ID;
 
   const preloadableConcreteRequest: PreloadableConcreteRequest<loadQueryTestQuery> =
     {
@@ -82,12 +83,12 @@ describe('loadQuery', () => {
   let fetch;
   let environment;
 
-  let executeUnsubscribe: ?JestMockFn<$ReadOnlyArray<mixed>, mixed>;
+  let executeUnsubscribe: ?JestMockFn<ReadonlyArray<unknown>, unknown>;
   let executeObservable;
 
   let networkUnsubscribe;
 
-  let disposeEnvironmentRetain: ?JestMockFn<$ReadOnlyArray<mixed>, mixed>;
+  let disposeEnvironmentRetain: ?JestMockFn<ReadonlyArray<unknown>, unknown>;
 
   let resolvedModule: ?Query<
     loadQueryTestQuery$variables,
@@ -96,6 +97,7 @@ describe('loadQuery', () => {
   let mockAvailability: {fetchTime?: number, status: string};
   let disposeOnloadCallback;
   let executeOnloadCallback;
+  let checkOperation;
 
   beforeEach(() => {
     fetch = jest.fn(
@@ -122,14 +124,24 @@ describe('loadQuery', () => {
         return observable;
       },
     );
-    environment = createMockEnvironment({network: Network.create(fetch)});
+    function wrapNetworkExecute(network: INetwork): INetwork {
+      return {
+        execute: (_1, _2, _3, _4, _5, _6, _7, _checkOperation) => {
+          checkOperation = _checkOperation;
+          return network.execute(_1, _2, _3, _4, _5, _6, _7, _checkOperation);
+        },
+      };
+    }
+    environment = createMockEnvironment({
+      network: wrapNetworkExecute(Network.create(fetch)),
+    });
 
     jest.clearAllTimers();
     jest.useFakeTimers();
     resolvedModule = query;
     mockAvailability = {
-      status: 'available',
       fetchTime: Date.now(),
+      status: 'available',
     };
 
     jest
@@ -140,7 +152,7 @@ describe('loadQuery', () => {
       .spyOn(PreloadableQueryRegistry, 'onLoad')
       .mockImplementation((key, cb) => {
         executeOnloadCallback = cb;
-        disposeOnloadCallback = jest.fn<$ReadOnlyArray<mixed>, mixed>();
+        disposeOnloadCallback = jest.fn<ReadonlyArray<unknown>, unknown>();
         return {dispose: disposeOnloadCallback};
       });
 
@@ -234,7 +246,7 @@ describe('loadQuery', () => {
             );
             const nextCallback = jest.fn(() => done());
             if (source) {
-              // $FlowFixMe[incompatible-call] Error found while enabling LTI on this file
+              // $FlowFixMe[incompatible-type] Error found while enabling LTI on this file
               source.subscribe({
                 next: nextCallback,
               });
@@ -248,9 +260,9 @@ describe('loadQuery', () => {
               expect.objectContaining({
                 operation: expect.objectContaining({
                   request: expect.objectContaining({
-                    identifier: expect.stringContaining(ID),
-                    variables: variables,
                     cacheConfig: {force: true},
+                    identifier: expect.stringContaining(ID),
+                    variables,
                   }),
                 }),
               }),
@@ -301,9 +313,9 @@ describe('loadQuery', () => {
               expect.objectContaining({
                 operation: expect.objectContaining({
                   request: expect.objectContaining({
-                    identifier: expect.stringContaining(ID),
-                    variables: variables,
                     cacheConfig: {force: true},
+                    identifier: expect.stringContaining(ID),
+                    variables,
                   }),
                 }),
               }),
@@ -397,6 +409,48 @@ describe('loadQuery', () => {
           expect(disposeEnvironmentRetain).toHaveBeenCalledTimes(1);
         });
       });
+
+      describe("with fetchPolicy === 'store-and-network'", () => {
+        it('should call fetch if the query can be fulfilled by the store', () => {
+          const {source} = loadQuery(
+            environment,
+            preloadableConcreteRequest,
+            variables,
+            {
+              fetchPolicy: 'store-and-network',
+            },
+          );
+          expect(fetch).toHaveBeenCalled();
+          // $FlowFixMe[method-unbinding] added when improving typing for this parameters
+          expect(environment.executeWithSource).toHaveBeenCalled();
+          expect(source).toBeDefined();
+          // Query should still be retained even if we don't fetch
+          // $FlowFixMe[method-unbinding] added when improving typing for this parameters
+          expect(environment.retain).toHaveBeenCalled();
+        });
+
+        it('returns the correct operation availability (available)', () => {
+          loadQuery(environment, preloadableConcreteRequest, variables, {
+            fetchPolicy: 'store-and-network',
+          });
+          expect(fetch).toHaveBeenCalled();
+          expect(checkOperation != null && checkOperation().status).toEqual(
+            'available',
+          );
+        });
+
+        it('returns the correct operation availability (missing)', () => {
+          mockAvailability = {status: 'missing'};
+
+          loadQuery(environment, preloadableConcreteRequest, variables, {
+            fetchPolicy: 'store-and-network',
+          });
+          expect(fetch).toHaveBeenCalled();
+          expect(checkOperation != null && checkOperation().status).toEqual(
+            'missing',
+          );
+        });
+      });
     });
 
     describe('when the query AST is unavailable synchronously', () => {
@@ -414,7 +468,7 @@ describe('loadQuery', () => {
         );
         const nextCallback = jest.fn(() => done());
         if (source) {
-          // $FlowFixMe[incompatible-call] Error found while enabling LTI on this file
+          // $FlowFixMe[incompatible-type] Error found while enabling LTI on this file
           source.subscribe({
             next: nextCallback,
           });
@@ -432,9 +486,9 @@ describe('loadQuery', () => {
           expect.objectContaining({
             operation: expect.objectContaining({
               request: expect.objectContaining({
-                identifier: expect.stringContaining(ID),
-                variables: variables,
                 cacheConfig: {force: true},
+                identifier: expect.stringContaining(ID),
+                variables,
               }),
             }),
           }),
@@ -486,9 +540,9 @@ describe('loadQuery', () => {
           expect.objectContaining({
             operation: expect.objectContaining({
               request: expect.objectContaining({
-                identifier: expect.stringContaining(ID),
-                variables: variables,
                 cacheConfig: {force: true},
+                identifier: expect.stringContaining(ID),
+                variables,
               }),
             }),
           }),
@@ -566,9 +620,9 @@ describe('loadQuery', () => {
           expect.objectContaining({
             operation: expect.objectContaining({
               request: expect.objectContaining({
-                identifier: expect.stringContaining(ID),
-                variables: variables,
                 cacheConfig: {force: true},
+                identifier: expect.stringContaining(ID),
+                variables,
               }),
             }),
           }),
@@ -657,7 +711,7 @@ describe('loadQuery', () => {
           });
           const nextCallback = jest.fn(() => done());
           if (source) {
-            // $FlowFixMe[incompatible-call] Error found while enabling LTI on this file
+            // $FlowFixMe[incompatible-type] Error found while enabling LTI on this file
             source.subscribe({
               next: nextCallback,
             });
@@ -671,9 +725,9 @@ describe('loadQuery', () => {
             expect.objectContaining({
               operation: expect.objectContaining({
                 request: expect.objectContaining({
-                  identifier: expect.stringContaining(ID),
-                  variables: variables,
                   cacheConfig: {force: true},
+                  identifier: expect.stringContaining(ID),
+                  variables,
                 }),
               }),
             }),
@@ -712,9 +766,9 @@ describe('loadQuery', () => {
             expect.objectContaining({
               operation: expect.objectContaining({
                 request: expect.objectContaining({
-                  identifier: expect.stringContaining(ID),
-                  variables: variables,
                   cacheConfig: {force: true},
+                  identifier: expect.stringContaining(ID),
+                  variables,
                 }),
               }),
             }),
@@ -762,7 +816,7 @@ describe('loadQuery', () => {
         const {source} = loadQuery(environment, query, variables);
         const nextCallback = jest.fn(() => done());
         if (source) {
-          // $FlowFixMe[incompatible-call] Error found while enabling LTI on this file
+          // $FlowFixMe[incompatible-type] Error found while enabling LTI on this file
           source.subscribe({
             next: nextCallback,
           });
@@ -776,9 +830,9 @@ describe('loadQuery', () => {
           expect.objectContaining({
             operation: expect.objectContaining({
               request: expect.objectContaining({
-                identifier: expect.stringContaining(ID),
-                variables: variables,
                 cacheConfig: {force: true},
+                identifier: expect.stringContaining(ID),
+                variables,
               }),
             }),
           }),

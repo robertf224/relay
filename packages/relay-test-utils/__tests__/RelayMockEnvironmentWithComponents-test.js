@@ -11,6 +11,8 @@
 
 'use strict';
 
+import type {RelayMockEnvironmentWithComponentsTestRemarkableFixSubscription$variables} from './__generated__/RelayMockEnvironmentWithComponentsTestRemarkableFixSubscription.graphql';
+import type {RenderProps} from 'react-relay/ReactRelayQueryRenderer';
 import type {
   HandleFieldPayload,
   RecordSourceProxy,
@@ -64,8 +66,10 @@ describe('ReactRelayTestMocker with Containers', () => {
             if (props) {
               return `My id ${props.user.id} and name is ${props.user.name}`;
             } else if (error) {
+              // $FlowFixMe[incompatible-type]
               return <div testID="error">{error.message}</div>;
             }
+            // $FlowFixMe[incompatible-type]
             return <div testID="loading">Loading...</div>;
           }}
         />
@@ -73,7 +77,7 @@ describe('ReactRelayTestMocker with Containers', () => {
       ReactTestRenderer.act(() => {
         testComponentTree = ReactTestRenderer.create(
           <TestComponent />,
-          // $FlowFixMe[prop-missing]
+          // $FlowFixMe[incompatible-type]
           {
             unstable_isConcurrent: true,
           },
@@ -175,6 +179,7 @@ describe('ReactRelayTestMocker with Containers', () => {
             id
             name
             ...RelayMockEnvironmentWithComponentsTestProminentSolutionFragment
+              @dangerously_unaliased_fixme
           }
         }
       `;
@@ -191,9 +196,9 @@ describe('ReactRelayTestMocker with Containers', () => {
         // In www, this is differently typed (via react-test-renderer.js.flow) than in
         // fbsource, so it isn't obvious (without syncing react-test-renderer.js.flow) how
         // to get flow to accept this typing.
-        // $FlowFixMe[missing-local-annot] Error found while enabling LTI on this file
-        props => {
+        (props: $FlowFixMe) => {
           return (
+            // $FlowFixMe[incompatible-type]
             <img
               testID="profile_picture"
               src={props.user.profile_picture.uri}
@@ -211,7 +216,7 @@ describe('ReactRelayTestMocker with Containers', () => {
           environment={environment}
           query={UserQuery}
           variables={{}}
-          render={({error, props}) => {
+          render={({error, props}: RenderProps<$FlowFixMe>) => {
             if (props) {
               return (
                 <div>
@@ -230,7 +235,7 @@ describe('ReactRelayTestMocker with Containers', () => {
       ReactTestRenderer.act(() => {
         testComponentTree = ReactTestRenderer.create(
           <TestComponent />,
-          // $FlowFixMe[prop-missing]
+          // $FlowFixMe[incompatible-type]
           {
             unstable_isConcurrent: true,
           },
@@ -284,6 +289,7 @@ describe('ReactRelayTestMocker with Containers', () => {
             id
             name
             ...RelayMockEnvironmentWithComponentsTestRobustAwesomenessFragment
+              @dangerously_unaliased_fixme
           }
         }
       `;
@@ -309,6 +315,7 @@ describe('ReactRelayTestMocker with Containers', () => {
         const [isLoading, setIsLoading] = useState(props.relay.isLoading());
         return (
           <>
+            {/* $FlowFixMe[incompatible-type] */}
             <ul testID="list">
               {props.user.friends.edges.map(({node, cursor}) => {
                 return (
@@ -319,7 +326,11 @@ describe('ReactRelayTestMocker with Containers', () => {
                 );
               })}
             </ul>
-            {isLoading && <div testID="loadingMore">Loading more...</div>}
+            {
+              // $FlowFixMe[incompatible-type]
+              isLoading && <div testID="loadingMore">Loading more...</div>
+            }
+            {/* $FlowFixMe[incompatible-type] */}
             <button
               disabled={isLoading || !props.relay.hasMore()}
               onClick={() => {
@@ -377,8 +388,10 @@ describe('ReactRelayTestMocker with Containers', () => {
                 </div>
               );
             } else if (error) {
+              // $FlowFixMe[incompatible-type]
               return <div testID="error">{error.message}</div>;
             }
+            // $FlowFixMe[incompatible-type]
             return <div testID="loading">Loading...</div>;
           }}
         />
@@ -386,7 +399,7 @@ describe('ReactRelayTestMocker with Containers', () => {
       ReactTestRenderer.act(() => {
         testComponentTree = ReactTestRenderer.create(
           <TestComponent />,
-          // $FlowFixMe[prop-missing]
+          // $FlowFixMe[incompatible-type]
           {
             unstable_isConcurrent: true,
           },
@@ -546,6 +559,7 @@ describe('ReactRelayTestMocker with Containers', () => {
         ) @relay_test_operation {
           node(id: $id) {
             ...RelayMockEnvironmentWithComponentsTestUsefulAwesomenessFragment
+              @dangerously_unaliased_fixme
           }
         }
       `;
@@ -561,9 +575,14 @@ describe('ReactRelayTestMocker with Containers', () => {
         const [isLoading, setIsLoading] = useState(false);
         return (
           <>
+            {/* $FlowFixMe[incompatible-type] */}
             <div testID="hometown">{props.page.name}</div>
             <div>Websites: {props.page.websites}</div>
-            {isLoading && <div testID="refetching">Refetching...</div>}
+            {
+              // $FlowFixMe[incompatible-type]
+              isLoading && <div testID="refetching">Refetching...</div>
+            }
+            {/* $FlowFixMe[incompatible-type] */}
             <button
               testID="refetch"
               disabled={isLoading}
@@ -607,8 +626,10 @@ describe('ReactRelayTestMocker with Containers', () => {
                 </div>
               );
             } else if (error) {
+              // $FlowFixMe[incompatible-type]
               return <div testID="error">{error.message}</div>;
             }
+            // $FlowFixMe[incompatible-type]
             return <div testID="loading">Loading...</div>;
           }}
         />
@@ -616,7 +637,7 @@ describe('ReactRelayTestMocker with Containers', () => {
       ReactTestRenderer.act(() => {
         testComponentTree = ReactTestRenderer.create(
           <TestComponent />,
-          // $FlowFixMe[prop-missing]
+          // $FlowFixMe[incompatible-type]
           {
             unstable_isConcurrent: true,
           },
@@ -712,6 +733,7 @@ describe('ReactRelayTestMocker with Containers', () => {
         ) {
           feedback: node(id: $id) {
             ...RelayMockEnvironmentWithComponentsTestNoticeableResultFragment
+              @dangerously_unaliased_fixme
           }
         }
       `;
@@ -745,9 +767,11 @@ describe('ReactRelayTestMocker with Containers', () => {
         return (
           <div>
             {errorMessage != null && (
+              // $FlowFixMe[incompatible-type]
               <span testID="errorMessage">{errorMessage}</span>
             )}
-            Feedback: {props.feedback.message.text}
+            {props.feedback.message.text}
+            {/* $FlowFixMe[incompatible-type] */}
             <button
               testID="likeButton"
               disabled={busy}
@@ -777,7 +801,7 @@ describe('ReactRelayTestMocker with Containers', () => {
                   },
                 });
               }}>
-              {props.feedback.doesViewerLike ?? false ? 'Unlike' : 'Like'}
+              {(props.feedback.doesViewerLike ?? false) ? 'Unlike' : 'Like'}
             </button>
           </div>
         );
@@ -805,8 +829,10 @@ describe('ReactRelayTestMocker with Containers', () => {
                   </>
                 );
               } else if (error) {
+                // $FlowFixMe[incompatible-type]
                 return <div testID="error">{error.message}</div>;
               }
+              // $FlowFixMe[incompatible-type]
               return <div testID="loading">Loading...</div>;
             }}
           />
@@ -815,7 +841,7 @@ describe('ReactRelayTestMocker with Containers', () => {
       ReactTestRenderer.act(() => {
         testComponentTree = ReactTestRenderer.create(
           <TestComponent />,
-          // $FlowFixMe[prop-missing]
+          // $FlowFixMe[incompatible-type]
           {
             unstable_isConcurrent: true,
           },
@@ -944,10 +970,13 @@ describe('ReactRelayTestMocker with Containers', () => {
           variables={{}}
           render={({error, props}) => {
             if (props) {
+              // $FlowFixMe[incompatible-type]
               return <div testID="helloMessage">{props.viewer.actor.name}</div>;
             } else if (error) {
+              // $FlowFixMe[incompatible-type]
               return <div testID="error">{error.message}</div>;
             }
+            // $FlowFixMe[incompatible-type]
             return <div testID="loading">Loading...</div>;
           }}
         />
@@ -955,7 +984,7 @@ describe('ReactRelayTestMocker with Containers', () => {
       ReactTestRenderer.act(() => {
         testComponentTree = ReactTestRenderer.create(
           <TestComponent />,
-          // $FlowFixMe[prop-missing]
+          // $FlowFixMe[incompatible-type]
           {
             unstable_isConcurrent: true,
           },
@@ -997,6 +1026,7 @@ describe('ReactRelayTestMocker with Containers', () => {
         ) {
           feedback: node(id: $id) {
             ...RelayMockEnvironmentWithComponentsTestImpactfulAwesomenessFragment
+              @dangerously_unaliased_fixme
           }
         }
       `;
@@ -1032,7 +1062,7 @@ describe('ReactRelayTestMocker with Containers', () => {
               input: {
                 feedbackId: props.feedback.id,
               },
-            },
+            } as RelayMockEnvironmentWithComponentsTestRemarkableFixSubscription$variables,
           });
           return () => {
             subscription.dispose();
@@ -1040,11 +1070,13 @@ describe('ReactRelayTestMocker with Containers', () => {
         });
         return (
           <div>
-            Feedback: {props.feedback.message.text}
+            {props.feedback.message.text}
+            {/* $FlowFixMe[incompatible-type] Error found when typing DOM
+             * intrinsics */}
             <span
               testID="reaction"
               reactionType={
-                props.feedback.doesViewerLike ?? false
+                (props.feedback.doesViewerLike ?? false)
                   ? 'Viewer likes it'
                   : 'Viewer does not like it'
               }
@@ -1073,8 +1105,10 @@ describe('ReactRelayTestMocker with Containers', () => {
                   />
                 );
               } else if (error) {
+                // $FlowFixMe[incompatible-type]
                 return <div testID="error">{error.message}</div>;
               }
+              // $FlowFixMe[incompatible-type]
               return <div testID="loading">Loading...</div>;
             }}
           />
@@ -1083,7 +1117,7 @@ describe('ReactRelayTestMocker with Containers', () => {
       ReactTestRenderer.act(() => {
         testComponentTree = ReactTestRenderer.create(
           <TestComponent />,
-          // $FlowFixMe[prop-missing]
+          // $FlowFixMe[incompatible-type]
           {
             unstable_isConcurrent: true,
           },
@@ -1184,6 +1218,7 @@ describe('ReactRelayTestMocker with Containers', () => {
             variables={{userId: 'my-user-id'}}
             render={({error, props}) => {
               if (props) {
+                // $FlowFixMe[incompatible-type]
                 return <div testID="user">{props.user.name}</div>;
               } else if (error) {
                 return <div>{error.message}</div>;
@@ -1197,6 +1232,7 @@ describe('ReactRelayTestMocker with Containers', () => {
             variables={{pageId: 'my-page-id'}}
             render={({error, props}) => {
               if (props) {
+                // $FlowFixMe[incompatible-type]
                 return <div testID="page">{props.page.name}</div>;
               } else if (error) {
                 return <div>{error.message}</div>;
@@ -1209,7 +1245,7 @@ describe('ReactRelayTestMocker with Containers', () => {
       ReactTestRenderer.act(() => {
         testComponentTree = ReactTestRenderer.create(
           <TestComponent />,
-          // $FlowFixMe[prop-missing]
+          // $FlowFixMe[incompatible-type]
           {
             unstable_isConcurrent: true,
           },
@@ -1290,8 +1326,10 @@ describe('ReactRelayTestMocker with Containers', () => {
           variables={{userId: 'my-user-id'}}
           render={({error, props}) => {
             if (props) {
+              // $FlowFixMe[incompatible-type]
               return <div testID="user">{props.user.name}</div>;
             } else if (error) {
+              // $FlowFixMe[incompatible-type]
               return <div testID="error">{error.message}</div>;
             }
             return <div>Loading...</div>;
@@ -1308,7 +1346,7 @@ describe('ReactRelayTestMocker with Containers', () => {
       ReactTestRenderer.act(() => {
         testComponentTree = ReactTestRenderer.create(
           <TestComponent />,
-          // $FlowFixMe[prop-missing]
+          // $FlowFixMe[incompatible-type]
           {
             unstable_isConcurrent: true,
           },
@@ -1325,7 +1363,7 @@ describe('ReactRelayTestMocker with Containers', () => {
       ReactTestRenderer.act(() => {
         testComponentTree = ReactTestRenderer.create(
           <TestComponent />,
-          // $FlowFixMe[prop-missing]
+          // $FlowFixMe[incompatible-type]
           {
             unstable_isConcurrent: true,
           },

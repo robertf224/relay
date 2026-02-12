@@ -19,17 +19,17 @@ const {fbContent} = require('docusaurus-plugin-internaldocs-fb/internal');
 
 const Guides = {
   'Fetching Data': [
-    ...fbContent({
-      internal: [
-        {
-          Pagination: [
-            'guided-tour/list-data/advanced-pagination',
-            'guided-tour/list-data/fb/blocking-pagination',
-          ],
-        },
+    {
+      Pagination: [
+        'guided-tour/list-data/connections',
+        'guided-tour/list-data/pagination',
+        'guided-tour/list-data/advanced-pagination',
+        ...fbContent({
+          internal: ['guided-tour/list-data/fb/blocking-pagination'],
+          external: [],
+        }),
       ],
-      external: ['guided-tour/list-data/advanced-pagination'],
-    }),
+    },
     ...fbContent({
       internal: [
         {
@@ -42,6 +42,14 @@ const Guides = {
       external: ['guided-tour/updating-data/graphql-subscriptions'],
     }),
     'guides/alias-directive',
+    {
+      'Data Driven Dependencies': [
+        'guides/data-driven-dependencies/introduction',
+        'guides/data-driven-dependencies/server-3d',
+        'guides/data-driven-dependencies/client-3d',
+        'guides/data-driven-dependencies/configuration',
+      ],
+    },
     ...fbContent({
       internal: [
         {
@@ -55,9 +63,7 @@ const Guides = {
           ],
           'Web-Only': [
             'guides/fb/incremental-data-delivery',
-            'guides/fb/data-driven-dependencies',
             'guides/fb/image-prefetching',
-            'guides/fb/comet-route-prefetching',
             'guides/fb/web-query-preloading',
             'guides/fb/production-graphql-endpoint-in-sandboxes',
             'guides/fb/react-flight',
@@ -76,7 +82,9 @@ const Guides = {
     'guides/semantic-nullability',
   ],
   'Updating Data': [
-    'guided-tour/list-data/updating-connections',
+    'guided-tour/updating-data/introduction',
+    'guided-tour/updating-data/graphql-mutations',
+    'guided-tour/updating-data/updating-connections',
     'guided-tour/updating-data/imperatively-modifying-store-data',
     'guided-tour/updating-data/imperatively-modifying-linked-fields',
     'guided-tour/updating-data/typesafe-updaters-faq',
@@ -95,11 +103,6 @@ const Guides = {
     'guided-tour/reusing-cached-data/rendering-partially-cached-data',
     'guided-tour/reusing-cached-data/filling-in-missing-data',
     'guided-tour/managing-data-outside-react/retaining-queries',
-    // These were already commented out
-    // 'guided-tour/managing-data-outside-react/prefetching-queries',
-    // 'guided-tour/managing-data-outside-react/subscribing-to-queries',
-    // 'guided-tour/managing-data-outside-react/reading-queries',
-    // 'guided-tour/managing-data-outside-react/reading-fragments',
   ],
   'Client Side Data': [
     {
@@ -135,6 +138,7 @@ const Guides = {
     }),
     'guides/type-emission',
   ],
+  Codemods: ['guides/codemods'],
   // TODO(T84797602) release incremental data delivery externally
   // 'guides/incremental-data-delivery',
   // TODO release these in OSS
@@ -148,11 +152,19 @@ module.exports = {
   docs: [
     'home',
     {
-      Installation: [
-        'getting-started/prerequisites',
-        'getting-started/installation-and-setup',
-        'editor-support',
+      'Get Started': [
+        'getting-started/quick-start',
+        'getting-started/babel-plugin',
         'getting-started/compiler',
+        'getting-started/compiler-config',
+        'getting-started/lint-rules',
+        'editor-support',
+        {
+          'Best Practices': [
+            'getting-started/production',
+            'tutorial/organizing-mutations-queries-and-subscriptions',
+          ],
+        },
       ],
       Tutorial: [
         'tutorial/intro',
@@ -167,9 +179,6 @@ module.exports = {
           label: 'Interfaces & Polymorphism',
         },
         'tutorial/refetchable-fragments',
-        'tutorial/connections-pagination',
-        'tutorial/mutations-updates',
-        'tutorial/organizing-mutations-queries-and-subscriptions',
       ],
       'Feature Guides': Guides,
       'API Reference': [
@@ -193,6 +202,7 @@ module.exports = {
             }),
             'api-reference/hooks/use-mutation',
             'api-reference/hooks/use-subscription',
+            'api-reference/hooks/use-prefetchable-forward-pagination-fragment',
           ],
           'Entrypoint APIs': [
             'api-reference/entrypoint-apis/use-entrypoint-loader',
@@ -200,10 +210,15 @@ module.exports = {
             'api-reference/entrypoint-apis/entrypoint-container',
           ],
           'Relay Runtime': [
+            'api-reference/relay-runtime/relay-environment',
             'api-reference/relay-runtime/fetch-query',
             'api-reference/relay-runtime/store',
+            'api-reference/relay-runtime/field-logger',
             'api-reference/relay-runtime/commit-mutation',
             'api-reference/relay-runtime/request-subscription',
+            'api-reference/relay-runtime/observe-fragment',
+            'api-reference/relay-runtime/wait-for-fragment-data',
+            'api-reference/relay-runtime/runtime-config',
           ],
         },
         {
@@ -213,7 +228,6 @@ module.exports = {
           ],
         },
         'api-reference/graphql/graphql-directives',
-        'api-reference/legacy-apis/legacy-apis',
       ],
       'Testing and Debugging': [
         'guides/testing-relay-components',
@@ -223,6 +237,7 @@ module.exports = {
             'debugging/fb/debugging-and-troubleshooting',
             'debugging/relay-devtools',
             'debugging/fb/network-logger',
+            'debugging/fb/performance-logger',
             'debugging/inconsistent-typename-error',
             'debugging/declarative-mutation-directives',
             'debugging/fb/debugging-suspense',
@@ -239,11 +254,6 @@ module.exports = {
           ],
         }),
         'error-reference/unknown-field',
-      ],
-      'Migration and Compatibility': [
-        'migration-and-compatibility/upgrading-to-relay-hooks',
-        'migration-and-compatibility/suspense-compatibility',
-        'migration-and-compatibility/relay-hooks-and-legacy-container-apis',
       ],
       'Principles and Architecture': [
         'principles-and-architecture/thinking-in-graphql',

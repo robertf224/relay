@@ -38,10 +38,21 @@ lazy_static! {
     /// a Relay Resolver model.
     pub static ref RELAY_RESOLVER_MODEL_DIRECTIVE_NAME: DirectiveName =
         DirectiveName("__RelayResolverModel".intern());
+    /// A field directive which indicates that the field is the generated ID field for a model type.
+    pub static ref RELAY_RESOLVER_MODEL_GENERATED_ID_FIELD_DIRECTIVE_NAME: DirectiveName =
+        DirectiveName("__RelayResolverModelGeneratedIDField".intern());
     /// If a field or model type has a @relay_resolver directive (see above)
     /// this argument name is used to track its @rootFragment (if any).
     pub static ref FRAGMENT_KEY_ARGUMENT_NAME: ArgumentName =
         ArgumentName("fragment_name".intern());
+    /// Indicates that the extraction mechanism used to derive this resolver's GraphQL type
+    /// has validated that its Flow/TypeScript type matches the GraphQL type.
+    pub static ref TYPE_CONFIRMED_ARGUMENT_NAME: ArgumentName =
+        ArgumentName("type_confirmed".intern());
+    /// Indicates that the resolver is just a property lookup on the underlying model (and we need to generate
+    /// code to do this lookup)
+    pub static ref RESOLVER_PROPERTY_LOOKUP_NAME: ArgumentName =
+        ArgumentName("property_lookup_name".intern());
     /// "Weak" resolver types are types which are backed by a JS model value, but which don't have a stable
     /// identity. Types in the generated schema are annotated with a directive using this name to signal
     /// to the rest of Relay that they are backed by a "weak" Relay Resolver model.
@@ -62,6 +73,10 @@ lazy_static! {
     /// schema definition indicating if it had the @outputType docblock tag.
     pub static ref HAS_OUTPUT_TYPE_ARGUMENT_NAME: ArgumentName =
         ArgumentName("has_output_type".intern());
+    /// Argument name for the `@relay_resolver` directive attached to resolver's
+    /// schema definition containing the fragment name from the @returnFragment docblock tag.
+    pub static ref RETURN_FRAGMENT_ARGUMENT_NAME: ArgumentName =
+        ArgumentName("return_fragment".intern());
     /// Relay codegen/typegen needs to know how to import a given resolver type
     /// or field. This name is the argument to the `@relay_resolver` directive
     /// attached to the schema definition for resolver types and fields that
@@ -124,6 +139,9 @@ lazy_static! {
     /// Name of docblock tag used to indicate that a resolver reads data from a
     /// fragment, and what the name of that fragment is.
     pub static ref ROOT_FRAGMENT_FIELD: StringKey = "rootFragment".intern();
+    /// Name of docblock tag used to indicate that a shadow resolver returns
+    /// data conforming to a specific fragment's shape.
+    pub static ref RETURN_FRAGMENT_FIELD: StringKey = "returnFragment".intern();
     /// _Legacy resolver syntax_: The name of the docblock tag used to indicate that the resolver returns
     /// a fully/deeply populated weak type. This feature is deprecated.
     pub static ref OUTPUT_TYPE_FIELD: StringKey = "outputType".intern();

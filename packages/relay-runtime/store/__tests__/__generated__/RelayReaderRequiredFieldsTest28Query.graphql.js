@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<50a799457627983199aaebcc40d33edf>>
+ * @generated SignedSource<<1794e78bb43d7aee1a7a2741f6b03bf8>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -61,7 +61,7 @@ var node/*: ClientRequest*/ = {
             "fragment": null,
             "kind": "RelayLiveResolver",
             "name": "live_user_resolver_always_suspend",
-            "resolverModule": require('./../resolvers/LiveUserAlwaysSuspendResolver').live_user_resolver_always_suspend,
+            "resolverModule": require('../resolvers/LiveUserAlwaysSuspendResolver').live_user_resolver_always_suspend,
             "path": "live_user_resolver_always_suspend"
           },
           "linkedField": {
@@ -83,8 +83,7 @@ var node/*: ClientRequest*/ = {
             "storageKey": null
           }
         },
-        "action": "THROW",
-        "path": "live_user_resolver_always_suspend"
+        "action": "THROW"
       }
     ],
     "type": "Query",

@@ -4,7 +4,7 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @generated SignedSource<<63626487811055e17831fb93aee7ca44>>
+ * @generated SignedSource<<b5ce6ba653f419089b892dcdd3b4b32d>>
  */
 
 mod refetchable_fragment;
@@ -66,6 +66,13 @@ async fn fragment_on_non_node_fetchable_type() {
     let input = include_str!("refetchable_fragment/fixtures/fragment-on-non-node-fetchable-type.graphql");
     let expected = include_str!("refetchable_fragment/fixtures/fragment-on-non-node-fetchable-type.expected");
     test_fixture(transform_fixture, file!(), "fragment-on-non-node-fetchable-type.graphql", "refetchable_fragment/fixtures/fragment-on-non-node-fetchable-type.expected", input, expected).await;
+}
+
+#[tokio::test]
+async fn fragment_on_non_node_fetchable_type_with_token_field() {
+    let input = include_str!("refetchable_fragment/fixtures/fragment-on-non-node-fetchable-type-with-token-field.graphql");
+    let expected = include_str!("refetchable_fragment/fixtures/fragment-on-non-node-fetchable-type-with-token-field.expected");
+    test_fixture(transform_fixture, file!(), "fragment-on-non-node-fetchable-type-with-token-field.graphql", "refetchable_fragment/fixtures/fragment-on-non-node-fetchable-type-with-token-field.expected", input, expected).await;
 }
 
 #[tokio::test]
@@ -171,6 +178,20 @@ async fn refetchable_fragment_with_connection_unstable_path_invalid() {
     let input = include_str!("refetchable_fragment/fixtures/refetchable-fragment-with-connection-unstable-path.invalid.graphql");
     let expected = include_str!("refetchable_fragment/fixtures/refetchable-fragment-with-connection-unstable-path.invalid.expected");
     test_fixture(transform_fixture, file!(), "refetchable-fragment-with-connection-unstable-path.invalid.graphql", "refetchable_fragment/fixtures/refetchable-fragment-with-connection-unstable-path.invalid.expected", input, expected).await;
+}
+
+#[tokio::test]
+async fn refetchable_fragment_with_connection_with_catch() {
+    let input = include_str!("refetchable_fragment/fixtures/refetchable-fragment-with-connection-with-catch.graphql");
+    let expected = include_str!("refetchable_fragment/fixtures/refetchable-fragment-with-connection-with-catch.expected");
+    test_fixture(transform_fixture, file!(), "refetchable-fragment-with-connection-with-catch.graphql", "refetchable_fragment/fixtures/refetchable-fragment-with-connection-with-catch.expected", input, expected).await;
+}
+
+#[tokio::test]
+async fn refetchable_fragment_with_connection_with_catch_to_null() {
+    let input = include_str!("refetchable_fragment/fixtures/refetchable-fragment-with-connection-with-catch-to-null.graphql");
+    let expected = include_str!("refetchable_fragment/fixtures/refetchable-fragment-with-connection-with-catch-to-null.expected");
+    test_fixture(transform_fixture, file!(), "refetchable-fragment-with-connection-with-catch-to-null.graphql", "refetchable_fragment/fixtures/refetchable-fragment-with-connection-with-catch-to-null.expected", input, expected).await;
 }
 
 #[tokio::test]

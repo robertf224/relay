@@ -11,6 +11,8 @@
 
 'use strict';
 import type {RelayMockEnvironment} from '../../relay-test-utils/RelayModernMockEnvironment';
+import type {NetworkWriteConfig} from '../ReactRelayTestMocker';
+import type {GeneratedNodeMap} from '../ReactRelayTypes';
 
 const RelayTestRenderer = require('../__mocks__/RelayTestRenderer');
 const {
@@ -21,7 +23,12 @@ const ReactRelayTestMocker = require('../ReactRelayTestMocker');
 const React = require('react');
 const ReactTestRenderer = require('react-test-renderer');
 const {graphql} = require('relay-runtime');
-const RelayTestUtils = require('relay-test-utils-internal');
+const {
+  createMockEnvironment,
+  injectPromisePolyfill__DEPRECATED,
+} = require('relay-test-utils-internal');
+
+injectPromisePolyfill__DEPRECATED();
 
 const ReactRelayTestMockerTestQuery = graphql`
   query ReactRelayTestMockerTestQuery {
@@ -41,7 +48,7 @@ const ReactRelayTestMockerTestNestedQuery = graphql`
     }
   }
 `;
-const ReactRelayTestMockerTest_meFragmentDefinition = {
+const ReactRelayTestMockerTest_meFragmentDefinition: GeneratedNodeMap = {
   me: graphql`
     fragment ReactRelayTestMockerTest_me on User {
       name
@@ -55,7 +62,6 @@ const ReactRelayTestMockerTestFragContainerTestQuery = graphql`
     }
   }
 `;
-const {createMockEnvironment} = RelayTestUtils;
 
 describe('ReactRelayTestMocker', () => {
   describe('generateId', () => {
@@ -93,7 +99,7 @@ describe('ReactRelayTestMocker', () => {
     });
 
     it('updates properly via default values', () => {
-      const testQueryDefault = {
+      const testQueryDefault: NetworkWriteConfig = {
         query: ReactRelayTestMockerTestQuery,
         payload: {data: payload},
       };
@@ -102,7 +108,7 @@ describe('ReactRelayTestMocker', () => {
 
       const nestedQuery = ReactRelayTestMockerTestNestedQuery;
 
-      const nestedQueryDefault = {
+      const nestedQueryDefault: NetworkWriteConfig = {
         query: ReactRelayTestMockerTestNestedQuery,
         payload: {
           data: {

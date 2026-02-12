@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<29854a2bd721fdfae953526de2bbd232>>
+ * @generated SignedSource<<c95f68cf864ac2e828cc3a1588a43726>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -28,10 +28,10 @@ import type { TestResolverContextType } from "../../../../mutations/__tests__/Te
   id: SpecialUser__id$data['id'],
   args: void,
   context: TestResolverContextType,
-) => mixed);
+) => unknown);
 declare export opaque type SpecialUser____relay_model_instance$fragmentType: FragmentType;
 export type SpecialUser____relay_model_instance$data = {|
-  +__relay_model_instance: $NonMaybeType<ReturnType<typeof specialUserRelayModelInstanceResolverType>>,
+  +__relay_model_instance: NonNullable<ReturnType<typeof specialUserRelayModelInstanceResolverType>>,
   +$fragmentType: SpecialUser____relay_model_instance$fragmentType,
 |};
 export type SpecialUser____relay_model_instance$key = {
@@ -57,7 +57,7 @@ var node/*: ReaderFragment*/ = {
       },
       "kind": "RelayResolver",
       "name": "__relay_model_instance",
-      "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./SpecialUser__id.graphql'), require('./../Client3DSpecialUserResolvers').SpecialUser, 'id', true),
+      "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./SpecialUser__id.graphql'), require('../Client3DSpecialUserResolvers').SpecialUser, 'id', true),
       "path": "__relay_model_instance"
     }
   ],

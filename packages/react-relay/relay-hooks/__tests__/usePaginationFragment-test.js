@@ -30,7 +30,12 @@ import type {
   usePaginationFragmentTestUserQuery$data,
   usePaginationFragmentTestUserQuery$variables,
 } from './__generated__/usePaginationFragmentTestUserQuery.graphql';
-import type {Direction, OperationDescriptor, Variables} from 'relay-runtime';
+import type {
+  Direction,
+  OperationDescriptor,
+  RelayContext,
+  Variables,
+} from 'relay-runtime';
 import type {Query} from 'relay-runtime/util/RelayRuntimeTypes';
 
 const usePaginationFragmentImpl = require('../usePaginationFragment');
@@ -54,6 +59,11 @@ const {
   createOperationDescriptor,
   graphql,
 } = require('relay-runtime');
+const {
+  injectPromisePolyfill__DEPRECATED,
+} = require('relay-test-utils-internal');
+
+injectPromisePolyfill__DEPRECATED();
 
 const {useMemo, useState} = React;
 
@@ -156,7 +166,7 @@ function assertCall(
 }
 
 function expectFragmentResults(
-  expectedCalls: $ReadOnlyArray<{
+  expectedCalls: ReadonlyArray<{
     data: $FlowFixMe,
     isLoadingNext: boolean,
     isLoadingPrevious: boolean,
@@ -171,7 +181,20 @@ function expectFragmentResults(
   renderSpy.mockClear();
 }
 
-function resolveQuery(payload: mixed) {
+function expectFragmentLastResult(expectedCall: {
+  data: $FlowFixMe,
+  isLoadingNext: boolean,
+  isLoadingPrevious: boolean,
+  hasNext: boolean,
+  hasPrevious: boolean,
+}) {
+  TestRenderer.act(() => jest.runAllImmediates());
+  const lastIdx = renderSpy.mock.calls.length - 1;
+  assertCall(expectedCall, lastIdx);
+  renderSpy.mockClear();
+}
+
+function resolveQuery(payload: unknown) {
   TestRenderer.act(() => {
     dataSource.next(payload);
   });
@@ -182,20 +205,16 @@ function resolveQuery(payload: mixed) {
 }
 
 function createFragmentRef(
-  id:
-    | $TEMPORARY$string<'node:1'>
-    | $TEMPORARY$string<'node:100'>
-    | $TEMPORARY$string<'node:2'>
-    | $TEMPORARY$string<'node:200'>,
+  id: string,
   owner: OperationDescriptor,
   fragmentName: string = 'usePaginationFragmentTestNestedUserFragment',
 ) {
   return {
-    [ID_KEY]: id,
+    [FRAGMENT_OWNER_KEY]: owner.request,
     [FRAGMENTS_KEY]: {
       [fragmentName]: {},
     },
-    [FRAGMENT_OWNER_KEY]: owner.request,
+    [ID_KEY]: id,
   };
 }
 
@@ -208,26 +227,26 @@ function createMockEnvironment() {
       _variables: Variables,
       _cacheConfig: CacheConfig,
     ) => {
-      return Observable.create((sink: Sink<mixed>) => {
+      return Observable.create((sink: Sink<unknown>) => {
         dataSource = sink;
-        unsubscribe = jest.fn<[], mixed>();
-        // $FlowFixMe[incompatible-call]
+        unsubscribe = jest.fn<[], unknown>();
+        // $FlowFixMe[incompatible-type]
         return unsubscribe;
       });
     },
   );
   const environment = new Environment({
-    getDataID: (data: {[string]: mixed}, typename: string) => {
+    getDataID: (data: {+[string]: unknown}, typename: string) => {
       // This is the default, but making it explicit in case we need to override
       return data.id;
     },
-    // $FlowFixMe[invalid-tuple-arity] Error found while enabling LTI on this file
-    // $FlowFixMe[incompatible-call] error found when enabling Flow LTI mode
-    network: Network.create(fetchFn),
-    store,
     handlerProvider: _name => {
       return ConnectionHandler;
     },
+    // $FlowFixMe[invalid-tuple-arity] Error found while enabling LTI on this file
+    // $FlowFixMe[incompatible-type] error found when enabling Flow LTI mode
+    network: Network.create(fetchFn),
+    store,
   });
   // $FlowFixMe[method-unbinding]
   const originalRetain = environment.retain;
@@ -244,16 +263,16 @@ beforeEach(() => {
   jest.mock('warning');
   /* $FlowFixMe[underconstrained-implicit-instantiation] error found when
    * enabling Flow LTI mode */
-  renderSpy = jest.fn<_, mixed>();
+  renderSpy = jest.fn<_, unknown>();
   // Set up environment and base data
   [environment, fetch] = createMockEnvironment();
 
   variablesWithoutID = {
     after: null,
-    first: 1,
     before: null,
-    last: null,
+    first: 1,
     isViewerFriend: false,
+    last: null,
     orderby: ['name'],
   };
   variables = {
@@ -282,6 +301,7 @@ beforeEach(() => {
     ) {
       node(id: $id) {
         ...usePaginationFragmentTestUserFragment
+          @dangerously_unaliased_fixme
           @arguments(isViewerFriendLocal: $isViewerFriend, orderby: $orderby)
       }
     }
@@ -299,6 +319,7 @@ beforeEach(() => {
       node(id: $id) {
         actor {
           ...usePaginationFragmentTestUserFragment
+            @dangerously_unaliased_fixme
             @arguments(isViewerFriendLocal: $isViewerFriend, orderby: $orderby)
         }
       }
@@ -316,6 +337,7 @@ beforeEach(() => {
       viewer {
         actor {
           ...usePaginationFragmentTestUserFragment
+            @dangerously_unaliased_fixme
             @arguments(isViewerFriendLocal: $isViewerFriend, orderby: $orderby)
         }
       }
@@ -331,6 +353,7 @@ beforeEach(() => {
     ) {
       node(id: $id) {
         ...usePaginationFragmentTestUserFragment
+          @dangerously_unaliased_fixme
           @arguments(isViewerFriendLocal: true, orderby: ["name"])
       }
     }
@@ -347,6 +370,7 @@ beforeEach(() => {
     ) {
       node(id: $id) {
         ...usePaginationFragmentTestUserFragmentWithStreaming
+          @dangerously_unaliased_fixme
           @arguments(isViewerFriendLocal: $isViewerFriend, orderby: $orderby)
       }
     }
@@ -447,8 +471,6 @@ beforeEach(() => {
   environment.commitPayload(query, {
     node: {
       __typename: 'User',
-      id: '1',
-      name: 'Alice',
       friends: {
         edges: [
           {
@@ -468,14 +490,14 @@ beforeEach(() => {
           startCursor: 'cursor:1',
         },
       },
+      id: '1',
+      name: 'Alice',
     },
   });
   environment.commitPayload(queryWithoutID, {
     viewer: {
       actor: {
         __typename: 'User',
-        id: '1',
-        name: 'Alice',
         friends: {
           edges: [
             {
@@ -495,14 +517,14 @@ beforeEach(() => {
             startCursor: 'cursor:1',
           },
         },
+        id: '1',
+        name: 'Alice',
       },
     },
   });
   environment.commitPayload(queryWithLiteralArgs, {
     node: {
       __typename: 'User',
-      id: '1',
-      name: 'Alice',
       friends: {
         edges: [
           {
@@ -522,6 +544,8 @@ beforeEach(() => {
           startCursor: 'cursor:1',
         },
       },
+      id: '1',
+      name: 'Alice',
     },
   });
 
@@ -543,31 +567,34 @@ beforeEach(() => {
     );
     const ownerOperationRef = useMemo(
       () => ({
-        [ID_KEY]: owner.request.variables.id ?? owner.request.variables.nodeID,
+        [FRAGMENT_OWNER_KEY]: owner.request,
         [FRAGMENTS_KEY]: {
           // $FlowFixMe[invalid-computed-prop] Error found while enabling LTI on this file
           [fragment.name]: {},
         },
-        [FRAGMENT_OWNER_KEY]: owner.request,
+        [ID_KEY]: owner.request.variables.id ?? owner.request.variables.nodeID,
       }),
       [owner, fragment.name],
     );
     const userRef = props.hasOwnProperty('userRef')
       ? props.userRef
-      : nodeUserRef ?? ownerOperationRef;
+      : (nodeUserRef ?? ownerOperationRef);
 
     setOwner = _setOwner;
 
     const {data: userData} = usePaginationFragment(
       fragment,
-      (userRef: $FlowFixMe),
+      userRef as $FlowFixMe,
     );
     return <Renderer user={userData} />;
   };
 
   const ContextProvider = ({children}: {children: React.Node}) => {
     const [env, _setEnv] = useState(environment);
-    const relayContext = useMemo(() => ({environment: env}), [env]);
+    const relayContext = useMemo(
+      (): RelayContext => ({environment: env}),
+      [env],
+    );
 
     setEnvironment = _setEnv;
 
@@ -596,7 +623,7 @@ beforeEach(() => {
             </ContextProvider>
           </React.Suspense>
         </ErrorBoundary>,
-        // $FlowFixMe[prop-missing] - error revealed when flow-typing ReactTestRenderer
+        // $FlowFixMe[incompatible-type] - error revealed when flow-typing ReactTestRenderer
         {unstable_isConcurrent: isConcurrent},
       );
     });
@@ -604,8 +631,6 @@ beforeEach(() => {
   };
 
   initialUser = {
-    id: '1',
-    name: 'Alice',
     friends: {
       edges: [
         {
@@ -625,6 +650,8 @@ beforeEach(() => {
         startCursor: 'cursor:1',
       },
     },
+    id: '1',
+    name: 'Alice',
   };
 });
 
@@ -708,11 +735,10 @@ describe.each([
       expectFragmentResults([
         {
           data: initialUser,
-          isLoadingNext: false,
-          isLoadingPrevious: false,
-
           hasNext: true,
           hasPrevious: false,
+          isLoadingNext: false,
+          isLoadingPrevious: false,
         },
       ]);
     });
@@ -722,11 +748,10 @@ describe.each([
       expectFragmentResults([
         {
           data: null,
-          isLoadingNext: false,
-          isLoadingPrevious: false,
-
           hasNext: false,
           hasPrevious: false,
+          isLoadingNext: false,
+          isLoadingPrevious: false,
         },
       ]);
     });
@@ -736,10 +761,10 @@ describe.each([
       expectFragmentResults([
         {
           data: null,
-          isLoadingNext: false,
-          isLoadingPrevious: false,
           hasNext: false,
           hasPrevious: false,
+          isLoadingNext: false,
+          isLoadingPrevious: false,
         },
       ]);
     });
@@ -749,10 +774,10 @@ describe.each([
       expectFragmentResults([
         {
           data: initialUser,
-          isLoadingNext: false,
-          isLoadingPrevious: false,
           hasNext: true,
           hasPrevious: false,
+          isLoadingNext: false,
+          isLoadingPrevious: false,
         },
       ]);
 
@@ -774,10 +799,10 @@ describe.each([
             // Assert that name is updated
             name: 'Alice in Wonderland',
           },
-          isLoadingNext: false,
-          isLoadingPrevious: false,
           hasNext: true,
           hasPrevious: false,
+          isLoadingNext: false,
+          isLoadingPrevious: false,
         },
       ]);
 
@@ -797,7 +822,6 @@ describe.each([
         {
           data: {
             ...initialUser,
-            name: 'Alice in Wonderland',
             friends: {
               ...initialUser.friends,
               edges: [
@@ -813,11 +837,12 @@ describe.each([
                 },
               ],
             },
+            name: 'Alice in Wonderland',
           },
-          isLoadingNext: false,
-          isLoadingPrevious: false,
           hasNext: true,
           hasPrevious: false,
+          isLoadingNext: false,
+          isLoadingPrevious: false,
         },
       ]);
     });
@@ -852,7 +877,7 @@ describe.each([
     let release;
 
     beforeEach(() => {
-      release = jest.fn<$ReadOnlyArray<mixed>, mixed>();
+      release = jest.fn<ReadonlyArray<unknown>, unknown>();
       // $FlowFixMe[method-unbinding] added when improving typing for this parameters
       environment.retain.mockImplementation((...args) => {
         return {
@@ -879,7 +904,7 @@ describe.each([
       renderer: any,
       direction: Direction,
       expected: {
-        data: mixed,
+        data: unknown,
         hasNext: boolean,
         hasPrevious: boolean,
         paginationVariables: Variables,
@@ -891,10 +916,10 @@ describe.each([
       assertCall(
         {
           data: expected.data,
-          isLoadingNext: direction === 'forward',
-          isLoadingPrevious: direction === 'backward',
           hasNext: expected.hasNext,
           hasPrevious: expected.hasPrevious,
+          isLoadingNext: direction === 'forward',
+          isLoadingPrevious: direction === 'backward',
         },
         0,
       );
@@ -923,10 +948,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -939,7 +964,7 @@ describe.each([
 
         expect(warning).toHaveBeenCalledTimes(2);
         expect(
-          (warning: $FlowFixMe).mock.calls[1][1].includes(
+          (warning as $FlowFixMe).mock.calls[1][1].includes(
             'Relay: Unexpected fetch on unmounted component',
           ),
         ).toEqual(true);
@@ -955,10 +980,10 @@ describe.each([
         expectFragmentResults([
           {
             data: null,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: false,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -968,7 +993,7 @@ describe.each([
 
         expect(warning).toHaveBeenCalledTimes(2);
         expect(
-          (warning: $FlowFixMe).mock.calls[1][1].includes(
+          (warning as $FlowFixMe).mock.calls[1][1].includes(
             'Relay: Unexpected fetch while using a null fragment ref',
           ),
         ).toEqual(true);
@@ -982,10 +1007,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -995,21 +1020,21 @@ describe.each([
         expect(callback).toBeCalledTimes(0);
 
         const paginationVariables = {
-          id: '1',
           after: 'cursor:1',
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
+          id: '1',
           isViewerFriendLocal: false,
+          last: null,
           orderby: ['name'],
           scale: null,
         };
         expectFragmentIsLoadingMore(renderer, direction, {
           data: initialUser,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
 
         TestRenderer.act(() => {
@@ -1036,10 +1061,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -1052,12 +1077,10 @@ describe.each([
       });
 
       it('attempts to load more even if there are no more items to load', () => {
-        (environment.getStore().getSource(): $FlowFixMe).clear();
+        (environment.getStore().getSource() as $FlowFixMe).clear();
         environment.commitPayload(query, {
           node: {
             __typename: 'User',
-            id: '1',
-            name: 'Alice',
             friends: {
               edges: [
                 {
@@ -1077,6 +1100,8 @@ describe.each([
                 startCursor: 'cursor:1',
               },
             },
+            id: '1',
+            name: 'Alice',
           },
         });
         const callback = jest.fn<[Error | null], void>();
@@ -1092,10 +1117,10 @@ describe.each([
         expectFragmentResults([
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: false,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -1104,21 +1129,21 @@ describe.each([
         });
 
         const paginationVariables = {
-          id: '1',
           after: 'cursor:1',
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
+          id: '1',
           isViewerFriendLocal: false,
+          last: null,
           orderby: ['name'],
           scale: null,
         };
         expectFragmentIsLoadingMore(renderer, direction, {
           data: expectedUser,
+          gqlPaginationQuery,
           hasNext: false,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
         expect(callback).toBeCalledTimes(0);
 
@@ -1126,28 +1151,28 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 // $FlowFixMe[missing-empty-array-annot]
                 edges: [],
                 pageInfo: {
-                  startCursor: null,
                   endCursor: null,
                   hasNextPage: null,
                   hasPreviousPage: null,
+                  startCursor: null,
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
         expectFragmentResults([
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: false,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
         expect(callback).toBeCalledTimes(1);
@@ -1159,10 +1184,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -1170,21 +1195,21 @@ describe.each([
           loadNext(1, {onComplete: callback});
         });
         const paginationVariables = {
-          id: '1',
           after: 'cursor:1',
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
+          id: '1',
           isViewerFriendLocal: false,
+          last: null,
           orderby: ['name'],
           scale: null,
         };
         expectFragmentIsLoadingMore(renderer, direction, {
           data: initialUser,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
         expect(callback).toBeCalledTimes(0);
 
@@ -1192,8 +1217,6 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -1207,12 +1230,14 @@ describe.each([
                   },
                 ],
                 pageInfo: {
-                  startCursor: 'cursor:2',
                   endCursor: 'cursor:2',
                   hasNextPage: true,
                   hasPreviousPage: true,
+                  startCursor: 'cursor:2',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
@@ -1253,18 +1278,18 @@ describe.each([
           {
             // First update has updated connection
             data: expectedUser,
-            isLoadingNext: true,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: true,
+            isLoadingPrevious: false,
           },
           {
             // Second update sets isLoading flag back to false
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
         expect(callback).toBeCalledTimes(1);
@@ -1294,10 +1319,10 @@ describe.each([
         expectFragmentResults([
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -1305,12 +1330,12 @@ describe.each([
           loadNext(1, {onComplete: callback});
         });
         const paginationVariables = {
-          id: '1',
           after: 'cursor:1',
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
+          id: '1',
           isViewerFriendLocal: true,
+          last: null,
           orderby: ['name'],
           scale: null,
         };
@@ -1319,10 +1344,10 @@ describe.each([
         );
         expectFragmentIsLoadingMore(renderer, direction, {
           data: expectedUser,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
         expect(callback).toBeCalledTimes(0);
 
@@ -1330,8 +1355,6 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -1345,12 +1368,14 @@ describe.each([
                   },
                 ],
                 pageInfo: {
-                  startCursor: 'cursor:2',
                   endCursor: 'cursor:2',
                   hasNextPage: true,
                   hasPreviousPage: true,
+                  startCursor: 'cursor:2',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
@@ -1391,18 +1416,18 @@ describe.each([
           {
             // First update has updated connection
             data: expectedUser,
-            isLoadingNext: true,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: true,
+            isLoadingPrevious: false,
           },
           {
             // Second update sets isLoading flag back to false
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
         expect(callback).toBeCalledTimes(1);
@@ -1437,10 +1462,10 @@ describe.each([
         expectFragmentResults([
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -1448,21 +1473,21 @@ describe.each([
           loadNext(1, {onComplete: callback});
         });
         const paginationVariables = {
-          id: '1',
           after: 'cursor:1',
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
+          id: '1',
           isViewerFriendLocal: false,
+          last: null,
           orderby: ['name'],
           scale: null,
         };
         expectFragmentIsLoadingMore(renderer, direction, {
           data: expectedUser,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
         expect(callback).toBeCalledTimes(0);
 
@@ -1470,8 +1495,6 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -1485,12 +1508,14 @@ describe.each([
                   },
                 ],
                 pageInfo: {
-                  startCursor: 'cursor:2',
                   endCursor: 'cursor:2',
                   hasNextPage: true,
                   hasPreviousPage: true,
+                  startCursor: 'cursor:2',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
@@ -1531,18 +1556,18 @@ describe.each([
           {
             // First update has updated connection
             data: expectedUser,
-            isLoadingNext: true,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: true,
+            isLoadingPrevious: false,
           },
           {
             // Second update sets isLoading flag back to false
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
         expect(callback).toBeCalledTimes(1);
@@ -1555,11 +1580,8 @@ describe.each([
         environment.commitPayload(queryNestedFragment, {
           node: {
             __typename: 'Feedback',
-            id: '<feedbackid>',
             actor: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -1579,17 +1601,19 @@ describe.each([
                   startCursor: 'cursor:1',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
+            id: '<feedbackid>',
           },
         });
 
         // Get fragment ref for user using nested fragment
-        const userRef = (environment.lookup(queryNestedFragment.fragment)
-          .data: $FlowFixMe)?.node?.actor;
+        const userRef = (
+          environment.lookup(queryNestedFragment.fragment).data as $FlowFixMe
+        )?.node?.actor;
 
         initialUser = {
-          id: '1',
-          name: 'Alice',
           friends: {
             edges: [
               {
@@ -1609,6 +1633,8 @@ describe.each([
               startCursor: 'cursor:1',
             },
           },
+          id: '1',
+          name: 'Alice',
         };
 
         const renderer = renderFragment({
@@ -1618,10 +1644,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -1629,23 +1655,23 @@ describe.each([
           loadNext(1, {onComplete: callback});
         });
         const paginationVariables = {
+          after: 'cursor:1',
+          before: null,
+          first: 1,
           // The id here should correspond to the user id, and not the
           // feedback id from the query variables (i.e. `<feedbackid>`)
           id: '1',
-          after: 'cursor:1',
-          first: 1,
-          before: null,
-          last: null,
           isViewerFriendLocal: false,
+          last: null,
           orderby: ['name'],
           scale: null,
         };
         expectFragmentIsLoadingMore(renderer, direction, {
           data: initialUser,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
         expect(callback).toBeCalledTimes(0);
 
@@ -1653,8 +1679,6 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -1668,12 +1692,14 @@ describe.each([
                   },
                 ],
                 pageInfo: {
-                  startCursor: 'cursor:2',
                   endCursor: 'cursor:2',
                   hasNextPage: true,
                   hasPreviousPage: true,
+                  startCursor: 'cursor:2',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
@@ -1714,18 +1740,18 @@ describe.each([
           {
             // First update has updated connection
             data: expectedUser,
-            isLoadingNext: true,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: true,
+            isLoadingPrevious: false,
           },
           {
             // Second update sets isLoading flag back to false
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
         expect(callback).toBeCalledTimes(1);
@@ -1737,10 +1763,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -1748,21 +1774,21 @@ describe.each([
           loadNext(1, {onComplete: callback});
         });
         const paginationVariables = {
-          id: '1',
           after: 'cursor:1',
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
+          id: '1',
           isViewerFriendLocal: false,
+          last: null,
           orderby: ['name'],
           scale: null,
         };
         expectFragmentIsLoadingMore(renderer, direction, {
           data: initialUser,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
         expect(callback).toBeCalledTimes(0);
 
@@ -1783,10 +1809,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -1794,21 +1820,21 @@ describe.each([
           loadNext(1, {onComplete: callback});
         });
         const paginationVariables = {
-          id: '1',
           after: 'cursor:1',
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
+          id: '1',
           isViewerFriendLocal: false,
+          last: null,
           orderby: ['name'],
           scale: null,
         };
         expectFragmentIsLoadingMore(renderer, direction, {
           data: initialUser,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
         expect(callback).toBeCalledTimes(0);
 
@@ -1820,10 +1846,10 @@ describe.each([
         // with new fragment ref that points to the same data.
         expectFragmentIsLoadingMore(renderer, direction, {
           data: initialUser,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
         expect(callback).toBeCalledTimes(0);
 
@@ -1831,8 +1857,6 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -1846,12 +1870,14 @@ describe.each([
                   },
                 ],
                 pageInfo: {
-                  startCursor: 'cursor:2',
                   endCursor: 'cursor:2',
                   hasNextPage: true,
                   hasPreviousPage: true,
+                  startCursor: 'cursor:2',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
@@ -1892,18 +1918,18 @@ describe.each([
           {
             // First update has updated connection
             data: expectedUser,
-            isLoadingNext: true,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: true,
+            isLoadingPrevious: false,
           },
           {
             // Second update sets isLoading flag back to false
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
         expect(callback).toBeCalledTimes(1);
@@ -1916,37 +1942,37 @@ describe.each([
           expectFragmentResults([
             {
               data: initialUser,
-              isLoadingNext: false,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: false,
+              isLoadingPrevious: false,
             },
           ]);
 
           TestRenderer.act(() => {
             loadNext(1, {
-              onComplete: callback,
               // Pass extra variables that are different from original request
               UNSTABLE_extraVariables: {scale: 2.0},
+              onComplete: callback,
             });
           });
           const paginationVariables = {
-            id: '1',
             after: 'cursor:1',
-            first: 1,
             before: null,
-            last: null,
+            first: 1,
+            id: '1',
             isViewerFriendLocal: false,
+            last: null,
             orderby: ['name'],
             // Assert that value from extra variables is used
             scale: 2.0,
           };
           expectFragmentIsLoadingMore(renderer, direction, {
             data: initialUser,
+            gqlPaginationQuery,
             hasNext: true,
             hasPrevious: false,
             paginationVariables,
-            gqlPaginationQuery,
           });
           expect(callback).toBeCalledTimes(0);
 
@@ -1954,8 +1980,6 @@ describe.each([
             data: {
               node: {
                 __typename: 'User',
-                id: '1',
-                name: 'Alice',
                 friends: {
                   edges: [
                     {
@@ -1969,12 +1993,14 @@ describe.each([
                     },
                   ],
                   pageInfo: {
-                    startCursor: 'cursor:2',
                     endCursor: 'cursor:2',
                     hasNextPage: true,
                     hasPreviousPage: true,
+                    startCursor: 'cursor:2',
                   },
                 },
+                id: '1',
+                name: 'Alice',
               },
             },
           });
@@ -2015,18 +2041,18 @@ describe.each([
             {
               // First update has updated connection
               data: expectedUser,
-              isLoadingNext: true,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: true,
+              isLoadingPrevious: false,
             },
             {
               // Second update sets isLoading flag back to false
               data: expectedUser,
-              isLoadingNext: false,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: false,
+              isLoadingPrevious: false,
             },
           ]);
           expect(callback).toBeCalledTimes(1);
@@ -2038,37 +2064,37 @@ describe.each([
           expectFragmentResults([
             {
               data: initialUser,
-              isLoadingNext: false,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: false,
+              isLoadingPrevious: false,
             },
           ]);
 
           TestRenderer.act(() => {
             loadNext(1, {
-              onComplete: callback,
               // Pass pagination vars as extra variables
-              UNSTABLE_extraVariables: {first: 100, after: 'foo'},
+              UNSTABLE_extraVariables: {after: 'foo', first: 100},
+              onComplete: callback,
             });
           });
           const paginationVariables = {
-            id: '1',
             // Assert that pagination vars from extra variables are ignored
             after: 'cursor:1',
-            first: 1,
             before: null,
-            last: null,
+            first: 1,
+            id: '1',
             isViewerFriendLocal: false,
+            last: null,
             orderby: ['name'],
             scale: null,
           };
           expectFragmentIsLoadingMore(renderer, direction, {
             data: initialUser,
+            gqlPaginationQuery,
             hasNext: true,
             hasPrevious: false,
             paginationVariables,
-            gqlPaginationQuery,
           });
           expect(callback).toBeCalledTimes(0);
 
@@ -2076,8 +2102,6 @@ describe.each([
             data: {
               node: {
                 __typename: 'User',
-                id: '1',
-                name: 'Alice',
                 friends: {
                   edges: [
                     {
@@ -2091,12 +2115,14 @@ describe.each([
                     },
                   ],
                   pageInfo: {
-                    startCursor: 'cursor:2',
                     endCursor: 'cursor:2',
                     hasNextPage: true,
                     hasPreviousPage: true,
+                    startCursor: 'cursor:2',
                   },
                 },
+                id: '1',
+                name: 'Alice',
               },
             },
           });
@@ -2137,18 +2163,18 @@ describe.each([
             {
               // First update has updated connection
               data: expectedUser,
-              isLoadingNext: true,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: true,
+              isLoadingPrevious: false,
             },
             {
               // Second update sets isLoading flag back to false
               data: expectedUser,
-              isLoadingNext: false,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: false,
+              isLoadingPrevious: false,
             },
           ]);
           expect(callback).toBeCalledTimes(1);
@@ -2164,10 +2190,10 @@ describe.each([
             expectFragmentResults([
               {
                 data: initialUser,
-                isLoadingNext: false,
-                isLoadingPrevious: false,
                 hasNext: true,
                 hasPrevious: false,
+                isLoadingNext: false,
+                isLoadingPrevious: false,
               },
             ]);
 
@@ -2175,21 +2201,21 @@ describe.each([
               loadNext(1, {onComplete: callback});
             });
             const paginationVariables = {
-              id: '1',
               after: 'cursor:1',
-              first: 1,
               before: null,
-              last: null,
+              first: 1,
+              id: '1',
               isViewerFriendLocal: false,
+              last: null,
               orderby: ['name'],
               scale: null,
             };
             expectFragmentIsLoadingMore(renderer, direction, {
               data: initialUser,
+              gqlPaginationQuery,
               hasNext: true,
               hasPrevious: false,
               paginationVariables,
-              gqlPaginationQuery,
             });
             expect(unsubscribe).toHaveBeenCalledTimes(0);
 
@@ -2203,8 +2229,6 @@ describe.each([
               data: {
                 node: {
                   __typename: 'User',
-                  id: '1',
-                  name: 'Alice',
                   friends: {
                     edges: [
                       {
@@ -2218,12 +2242,14 @@ describe.each([
                       },
                     ],
                     pageInfo: {
-                      startCursor: 'cursor:2',
                       endCursor: 'cursor:2',
                       hasNextPage: true,
                       hasPreviousPage: true,
+                      startCursor: 'cursor:2',
                     },
                   },
+                  id: '1',
+                  name: 'Alice',
                 },
               },
             });
@@ -2239,10 +2265,10 @@ describe.each([
             expectFragmentResults([
               {
                 data: initialUser,
-                isLoadingNext: false,
-                isLoadingPrevious: false,
                 hasNext: true,
                 hasPrevious: false,
+                isLoadingNext: false,
+                isLoadingPrevious: false,
               },
             ]);
           });
@@ -2254,10 +2280,10 @@ describe.each([
             expectFragmentResults([
               {
                 data: initialUser,
-                isLoadingNext: false,
-                isLoadingPrevious: false,
                 hasNext: true,
                 hasPrevious: false,
+                isLoadingNext: false,
+                isLoadingPrevious: false,
               },
             ]);
 
@@ -2265,21 +2291,21 @@ describe.each([
               loadNext(1, {onComplete: callback});
             });
             const paginationVariables = {
-              id: '1',
               after: 'cursor:1',
-              first: 1,
               before: null,
-              last: null,
+              first: 1,
+              id: '1',
               isViewerFriendLocal: false,
+              last: null,
               orderby: ['name'],
               scale: null,
             };
             expectFragmentIsLoadingMore(renderer, direction, {
               data: initialUser,
+              gqlPaginationQuery,
               hasNext: true,
               hasPrevious: false,
               paginationVariables,
-              gqlPaginationQuery,
             });
             expect(unsubscribe).toHaveBeenCalledTimes(0);
 
@@ -2293,8 +2319,6 @@ describe.each([
               data: {
                 node: {
                   __typename: 'User',
-                  id: '1',
-                  name: 'Alice',
                   friends: {
                     edges: [
                       {
@@ -2308,12 +2332,14 @@ describe.each([
                       },
                     ],
                     pageInfo: {
-                      startCursor: 'cursor:2',
                       endCursor: 'cursor:2',
                       hasNextPage: true,
                       hasPreviousPage: true,
+                      startCursor: 'cursor:2',
                     },
                   },
+                  id: '1',
+                  name: 'Alice',
                 },
               },
             });
@@ -2361,10 +2387,10 @@ describe.each([
             expectFragmentResults([
               {
                 data: expectedUser,
-                isLoadingNext: false,
-                isLoadingPrevious: false,
                 hasNext: true,
                 hasPrevious: false,
+                isLoadingNext: false,
+                isLoadingPrevious: false,
               },
             ]);
           });
@@ -2377,10 +2403,10 @@ describe.each([
           expectFragmentResults([
             {
               data: initialUser,
-              isLoadingNext: false,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: false,
+              isLoadingPrevious: false,
             },
           ]);
 
@@ -2388,21 +2414,21 @@ describe.each([
             loadNext(1, {onComplete: callback});
           });
           const paginationVariables = {
-            id: '1',
             after: 'cursor:1',
-            first: 1,
             before: null,
-            last: null,
+            first: 1,
+            id: '1',
             isViewerFriendLocal: false,
+            last: null,
             orderby: ['name'],
             scale: null,
           };
           expectFragmentIsLoadingMore(renderer, direction, {
             data: initialUser,
+            gqlPaginationQuery,
             hasNext: true,
             hasPrevious: false,
             paginationVariables,
-            gqlPaginationQuery,
           });
           expect(unsubscribe).toHaveBeenCalledTimes(0);
           const loadNextUnsubscribe = unsubscribe;
@@ -2423,10 +2449,10 @@ describe.each([
           expectFragmentResults([
             {
               data: initialUser,
-              isLoadingNext: false,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: false,
+              isLoadingPrevious: false,
             },
           ]);
 
@@ -2436,21 +2462,21 @@ describe.each([
 
           // Assert request is started
           const paginationVariables = {
-            id: '1',
             after: 'cursor:1',
-            first: 1,
             before: null,
-            last: null,
+            first: 1,
+            id: '1',
             isViewerFriendLocal: false,
+            last: null,
             orderby: ['name'],
             scale: null,
           };
           expectFragmentIsLoadingMore(renderer, direction, {
             data: initialUser,
+            gqlPaginationQuery,
             hasNext: true,
             hasPrevious: false,
             paginationVariables,
-            gqlPaginationQuery,
           });
           const loadNextUnsubscribe = unsubscribe;
           expect(callback).toBeCalledTimes(0);
@@ -2462,8 +2488,6 @@ describe.each([
           newEnvironment.commitPayload(query, {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice in a different environment',
               friends: {
                 edges: [
                   {
@@ -2483,6 +2507,8 @@ describe.each([
                   startCursor: 'cursor:1',
                 },
               },
+              id: '1',
+              name: 'Alice in a different environment',
             },
           });
           TestRenderer.act(() => {
@@ -2501,20 +2527,20 @@ describe.each([
                 ...initialUser,
                 name: 'Alice in a different environment',
               },
-              isLoadingNext: true,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: true,
+              isLoadingPrevious: false,
             },
             {
               data: {
                 ...initialUser,
                 name: 'Alice in a different environment',
               },
-              isLoadingNext: false,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: false,
+              isLoadingPrevious: false,
             },
           ]);
         });
@@ -2525,10 +2551,10 @@ describe.each([
           expectFragmentResults([
             {
               data: initialUser,
-              isLoadingNext: false,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: false,
+              isLoadingPrevious: false,
             },
           ]);
 
@@ -2538,21 +2564,21 @@ describe.each([
 
           // Assert request is started
           const paginationVariables = {
-            id: '1',
             after: 'cursor:1',
-            first: 1,
             before: null,
-            last: null,
+            first: 1,
+            id: '1',
             isViewerFriendLocal: false,
+            last: null,
             orderby: ['name'],
             scale: null,
           };
           expectFragmentIsLoadingMore(renderer, direction, {
             data: initialUser,
+            gqlPaginationQuery,
             hasNext: true,
             hasPrevious: false,
             paginationVariables,
-            gqlPaginationQuery,
           });
           expect(callback).toBeCalledTimes(0);
 
@@ -2562,8 +2588,6 @@ describe.each([
           environment.commitPayload(newQuery, {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -2583,6 +2607,8 @@ describe.each([
                   startCursor: 'cursor:1',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           });
           fetch.mockClear();
@@ -2617,17 +2643,17 @@ describe.each([
           expectFragmentResults([
             {
               data: expectedUser,
-              isLoadingNext: true,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: true,
+              isLoadingPrevious: false,
             },
             {
               data: expectedUser,
-              isLoadingNext: false,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: false,
+              isLoadingPrevious: false,
             },
           ]);
         });
@@ -2639,10 +2665,10 @@ describe.each([
             expectFragmentResults([
               {
                 data: initialUser,
-                isLoadingNext: false,
-                isLoadingPrevious: false,
                 hasNext: true,
                 hasPrevious: false,
+                isLoadingNext: false,
+                isLoadingPrevious: false,
               },
             ]);
 
@@ -2653,21 +2679,21 @@ describe.each([
 
             // Assert request is started
             const paginationVariables = {
-              id: '1',
               after: 'cursor:1',
-              first: 1,
               before: null,
-              last: null,
+              first: 1,
+              id: '1',
               isViewerFriendLocal: false,
+              last: null,
               orderby: ['name'],
               scale: null,
             };
             expectFragmentIsLoadingMore(renderer, direction, {
               data: initialUser,
+              gqlPaginationQuery,
               hasNext: true,
               hasPrevious: false,
               paginationVariables,
-              gqlPaginationQuery,
             });
             expect(callback).toBeCalledTimes(0);
 
@@ -2684,8 +2710,6 @@ describe.each([
               data: {
                 node: {
                   __typename: 'User',
-                  id: '1',
-                  name: 'Alice',
                   friends: {
                     edges: [
                       {
@@ -2699,12 +2723,14 @@ describe.each([
                       },
                     ],
                     pageInfo: {
-                      startCursor: 'cursor:2',
                       endCursor: 'cursor:2',
                       hasNextPage: true,
                       hasPreviousPage: true,
+                      startCursor: 'cursor:2',
                     },
                   },
+                  id: '1',
+                  name: 'Alice',
                 },
               },
             });
@@ -2717,10 +2743,10 @@ describe.each([
             expectFragmentResults([
               {
                 data: initialUser,
-                isLoadingNext: false,
-                isLoadingPrevious: false,
                 hasNext: true,
                 hasPrevious: false,
+                isLoadingNext: false,
+                isLoadingPrevious: false,
               },
             ]);
 
@@ -2731,21 +2757,21 @@ describe.each([
 
             // Assert request is started
             const paginationVariables = {
-              id: '1',
               after: 'cursor:1',
-              first: 1,
               before: null,
-              last: null,
+              first: 1,
+              id: '1',
               isViewerFriendLocal: false,
+              last: null,
               orderby: ['name'],
               scale: null,
             };
             expectFragmentIsLoadingMore(renderer, direction, {
               data: initialUser,
+              gqlPaginationQuery,
               hasNext: true,
               hasPrevious: false,
               paginationVariables,
-              gqlPaginationQuery,
             });
             expect(callback).toBeCalledTimes(0);
 
@@ -2762,8 +2788,6 @@ describe.each([
               data: {
                 node: {
                   __typename: 'User',
-                  id: '1',
-                  name: 'Alice',
                   friends: {
                     edges: [
                       {
@@ -2777,12 +2801,14 @@ describe.each([
                       },
                     ],
                     pageInfo: {
-                      startCursor: 'cursor:2',
                       endCursor: 'cursor:2',
                       hasNextPage: true,
                       hasPreviousPage: true,
+                      startCursor: 'cursor:2',
                     },
                   },
+                  id: '1',
+                  name: 'Alice',
                 },
               },
             });
@@ -2824,17 +2850,17 @@ describe.each([
             expectFragmentResults([
               {
                 data: expectedUser,
-                isLoadingNext: true,
-                isLoadingPrevious: false,
                 hasNext: true,
                 hasPrevious: false,
+                isLoadingNext: true,
+                isLoadingPrevious: false,
               },
               {
                 data: expectedUser,
-                isLoadingNext: false,
-                isLoadingPrevious: false,
                 hasNext: true,
                 hasPrevious: false,
+                isLoadingNext: false,
+                isLoadingPrevious: false,
               },
             ]);
           });
@@ -2878,8 +2904,6 @@ describe.each([
               data: {
                 node: {
                   __typename: 'User',
-                  id: '1',
-                  name: 'Alice',
                   friends: {
                     edges: [
                       {
@@ -2893,6 +2917,8 @@ describe.each([
                       },
                     ],
                   },
+                  id: '1',
+                  name: 'Alice',
                 },
               },
               extensions: {
@@ -2931,10 +2957,10 @@ describe.each([
                   },
                 },
               },
-              isLoadingNext: false,
-              isLoadingPrevious: false,
               hasNext: false,
               hasPrevious: false,
+              isLoadingNext: false,
+              isLoadingPrevious: false,
             },
           ]);
 
@@ -2954,12 +2980,12 @@ describe.each([
                   hasNextPage: true,
                 },
               },
-              label:
-                'usePaginationFragmentTestUserFragmentWithStreaming$defer$UserFragment_friends$pageInfo',
-              path: ['node', 'friends'],
               extensions: {
                 is_final: true,
               },
+              label:
+                'usePaginationFragmentTestUserFragmentWithStreaming$defer$UserFragment_friends$pageInfo',
+              path: ['node', 'friends'],
             });
           });
           // Ensure request is no longer active since final payload has been
@@ -2994,10 +3020,10 @@ describe.each([
                   },
                 },
               },
-              isLoadingNext: false,
-              isLoadingPrevious: false,
               hasNext: true,
               hasPrevious: false,
+              isLoadingNext: false,
+              isLoadingPrevious: false,
             },
           ]);
 
@@ -3032,12 +3058,10 @@ describe.each([
       const direction = 'forward';
 
       it('returns true if it has more items', () => {
-        (environment.getStore().getSource(): $FlowFixMe).clear();
+        (environment.getStore().getSource() as $FlowFixMe).clear();
         environment.commitPayload(query, {
           node: {
             __typename: 'User',
-            id: '1',
-            name: 'Alice',
             friends: {
               edges: [
                 {
@@ -3057,6 +3081,8 @@ describe.each([
                 startCursor: 'cursor:1',
               },
             },
+            id: '1',
+            name: 'Alice',
           },
         });
 
@@ -3070,22 +3096,20 @@ describe.each([
                 pageInfo: expect.objectContaining({hasNextPage: true}),
               },
             },
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             // Assert hasNext is true
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
       });
 
       it('returns false if edges are null', () => {
-        (environment.getStore().getSource(): $FlowFixMe).clear();
+        (environment.getStore().getSource() as $FlowFixMe).clear();
         environment.commitPayload(query, {
           node: {
             __typename: 'User',
-            id: '1',
-            name: 'Alice',
             friends: {
               edges: null,
               pageInfo: {
@@ -3095,6 +3119,8 @@ describe.each([
                 startCursor: 'cursor:1',
               },
             },
+            id: '1',
+            name: 'Alice',
           },
         });
 
@@ -3109,22 +3135,20 @@ describe.each([
                 pageInfo: expect.objectContaining({hasNextPage: true}),
               },
             },
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             // Assert hasNext is false
             hasNext: false,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
       });
 
       it('returns false if edges are undefined', () => {
-        (environment.getStore().getSource(): $FlowFixMe).clear();
+        (environment.getStore().getSource() as $FlowFixMe).clear();
         environment.commitPayload(query, {
           node: {
             __typename: 'User',
-            id: '1',
-            name: 'Alice',
             friends: {
               edges: undefined,
               pageInfo: {
@@ -3134,6 +3158,8 @@ describe.each([
                 startCursor: 'cursor:1',
               },
             },
+            id: '1',
+            name: 'Alice',
           },
         });
 
@@ -3148,22 +3174,20 @@ describe.each([
                 pageInfo: expect.objectContaining({hasNextPage: true}),
               },
             },
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             // Assert hasNext is false
             hasNext: false,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
       });
 
       it('returns false if end cursor is null', () => {
-        (environment.getStore().getSource(): $FlowFixMe).clear();
+        (environment.getStore().getSource() as $FlowFixMe).clear();
         environment.commitPayload(query, {
           node: {
             __typename: 'User',
-            id: '1',
-            name: 'Alice',
             friends: {
               edges: [
                 {
@@ -3185,6 +3209,8 @@ describe.each([
                 startCursor: null,
               },
             },
+            id: '1',
+            name: 'Alice',
           },
         });
 
@@ -3201,22 +3227,20 @@ describe.each([
                 }),
               },
             },
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             // Assert hasNext is false
             hasNext: false,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
       });
 
       it('returns false if end cursor is undefined', () => {
-        (environment.getStore().getSource(): $FlowFixMe).clear();
+        (environment.getStore().getSource() as $FlowFixMe).clear();
         environment.commitPayload(query, {
           node: {
             __typename: 'User',
-            id: '1',
-            name: 'Alice',
             friends: {
               edges: [
                 {
@@ -3238,6 +3262,8 @@ describe.each([
                 startCursor: undefined,
               },
             },
+            id: '1',
+            name: 'Alice',
           },
         });
 
@@ -3254,22 +3280,20 @@ describe.each([
                 }),
               },
             },
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             // Assert hasNext is false
             hasNext: false,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
       });
 
       it('returns false if pageInfo.hasNextPage is false-ish', () => {
-        (environment.getStore().getSource(): $FlowFixMe).clear();
+        (environment.getStore().getSource() as $FlowFixMe).clear();
         environment.commitPayload(query, {
           node: {
             __typename: 'User',
-            id: '1',
-            name: 'Alice',
             friends: {
               edges: [
                 {
@@ -3289,6 +3313,8 @@ describe.each([
                 startCursor: 'cursor:1',
               },
             },
+            id: '1',
+            name: 'Alice',
           },
         });
 
@@ -3304,22 +3330,20 @@ describe.each([
                 }),
               },
             },
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             // Assert hasNext is false
             hasNext: false,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
       });
 
       it('returns false if pageInfo.hasNextPage is false', () => {
-        (environment.getStore().getSource(): $FlowFixMe).clear();
+        (environment.getStore().getSource() as $FlowFixMe).clear();
         environment.commitPayload(query, {
           node: {
             __typename: 'User',
-            id: '1',
-            name: 'Alice',
             friends: {
               edges: [
                 {
@@ -3339,6 +3363,8 @@ describe.each([
                 startCursor: 'cursor:1',
               },
             },
+            id: '1',
+            name: 'Alice',
           },
         });
 
@@ -3354,11 +3380,11 @@ describe.each([
                 }),
               },
             },
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             // Assert hasNext is false
             hasNext: false,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
       });
@@ -3369,11 +3395,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
-
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -3381,21 +3406,21 @@ describe.each([
           loadNext(1, {onComplete: callback});
         });
         const paginationVariables = {
-          id: '1',
           after: 'cursor:1',
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
+          id: '1',
           isViewerFriendLocal: false,
+          last: null,
           orderby: ['name'],
           scale: null,
         };
         expectFragmentIsLoadingMore(renderer, direction, {
           data: initialUser,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
         expect(callback).toBeCalledTimes(0);
 
@@ -3403,8 +3428,6 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -3418,12 +3441,14 @@ describe.each([
                   },
                 ],
                 pageInfo: {
-                  startCursor: 'cursor:2',
                   endCursor: 'cursor:2',
                   hasNextPage: true,
                   hasPreviousPage: true,
+                  startCursor: 'cursor:2',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
@@ -3464,20 +3489,20 @@ describe.each([
           {
             // First update has updated connection
             data: expectedUser,
-            isLoadingNext: true,
-            isLoadingPrevious: false,
             // Assert hasNext reflects server response
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: true,
+            isLoadingPrevious: false,
           },
           {
             // Second update sets isLoading flag back to false
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             // Assert hasNext reflects server response
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
         expect(callback).toBeCalledTimes(1);
@@ -3489,10 +3514,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -3500,21 +3525,21 @@ describe.each([
           loadNext(1, {onComplete: callback});
         });
         const paginationVariables = {
-          id: '1',
           after: 'cursor:1',
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
+          id: '1',
           isViewerFriendLocal: false,
+          last: null,
           orderby: ['name'],
           scale: null,
         };
         expectFragmentIsLoadingMore(renderer, direction, {
           data: initialUser,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
         expect(callback).toBeCalledTimes(0);
 
@@ -3522,8 +3547,6 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -3537,12 +3560,14 @@ describe.each([
                   },
                 ],
                 pageInfo: {
-                  startCursor: 'cursor:2',
                   endCursor: 'cursor:2',
                   hasNextPage: false,
                   hasPreviousPage: true,
+                  startCursor: 'cursor:2',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
@@ -3583,20 +3608,20 @@ describe.each([
           {
             // First update has updated connection
             data: expectedUser,
-            isLoadingNext: true,
-            isLoadingPrevious: false,
             // Assert hasNext reflects server response
             hasNext: false,
             hasPrevious: false,
+            isLoadingNext: true,
+            isLoadingPrevious: false,
           },
           {
             // Second update sets isLoading flag back to false
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             // Assert hasNext reflects server response
             hasNext: false,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
         expect(callback).toBeCalledTimes(1);
@@ -3607,7 +3632,7 @@ describe.each([
       // The bulk of refetch behavior is covered in useRefetchableFragmentNode-test,
       // so this suite covers the pagination-related test cases.
       function expectRefetchRequestIsInFlight(expected: {
-        data: mixed,
+        data: unknown,
         gqlRefetchQuery?: any,
         hasNext: boolean,
         hasPrevious: boolean,
@@ -3632,7 +3657,7 @@ describe.each([
       function expectFragmentIsRefetching(
         renderer: any,
         expected: {
-          data: mixed,
+          data: unknown,
           hasNext: boolean,
           hasPrevious: boolean,
           refetchVariables: Variables,
@@ -3669,10 +3694,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -3684,11 +3709,11 @@ describe.each([
         // suspends upon refetch
         const refetchVariables = {
           after: null,
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
           id: '4',
           isViewerFriendLocal: false,
+          last: null,
           orderby: ['name'],
           scale: null,
         };
@@ -3701,8 +3726,8 @@ describe.each([
           data: initialUser,
           hasNext: true,
           hasPrevious: false,
-          refetchVariables,
           refetchQuery: paginationQuery,
+          refetchVariables,
         });
 
         // Mock network response
@@ -3710,8 +3735,6 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '4',
-              name: 'Mark',
               friends: {
                 edges: [
                   {
@@ -3731,14 +3754,14 @@ describe.each([
                   startCursor: 'cursor:100',
                 },
               },
+              id: '4',
+              name: 'Mark',
             },
           },
         });
 
         // Assert fragment is rendered with new data
         const expectedUser = {
-          id: '4',
-          name: 'Mark',
           friends: {
             edges: [
               {
@@ -3758,21 +3781,23 @@ describe.each([
               startCursor: 'cursor:100',
             },
           },
+          id: '4',
+          name: 'Mark',
         };
         expectFragmentResults([
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -3789,10 +3814,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -3804,11 +3829,11 @@ describe.each([
         // suspends upon refetch
         const refetchVariables = {
           after: null,
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
           id: '1',
           isViewerFriendLocal: true,
+          last: null,
           orderby: ['lastname'],
           scale: null,
         };
@@ -3821,8 +3846,8 @@ describe.each([
           data: initialUser,
           hasNext: true,
           hasPrevious: false,
-          refetchVariables,
           refetchQuery: paginationQuery,
+          refetchVariables,
         });
 
         // Mock network response
@@ -3830,8 +3855,6 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -3851,14 +3874,14 @@ describe.each([
                   startCursor: 'cursor:100',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
 
         // Assert fragment is rendered with new data
         const expectedUser = {
-          id: '1',
-          name: 'Alice',
           friends: {
             edges: [
               {
@@ -3878,21 +3901,23 @@ describe.each([
               startCursor: 'cursor:100',
             },
           },
+          id: '1',
+          name: 'Alice',
         };
         expectFragmentResults([
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -3909,11 +3934,8 @@ describe.each([
         environment.commitPayload(queryNestedFragment, {
           node: {
             __typename: 'Feedback',
-            id: '<feedbackid>',
             actor: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -3933,17 +3955,19 @@ describe.each([
                   startCursor: 'cursor:1',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
+            id: '<feedbackid>',
           },
         });
 
         // Get fragment ref for user using nested fragment
-        const userRef = (environment.lookup(queryNestedFragment.fragment)
-          .data: $FlowFixMe)?.node?.actor;
+        const userRef = (
+          environment.lookup(queryNestedFragment.fragment).data as $FlowFixMe
+        )?.node?.actor;
 
         initialUser = {
-          id: '1',
-          name: 'Alice',
           friends: {
             edges: [
               {
@@ -3963,6 +3987,8 @@ describe.each([
               startCursor: 'cursor:1',
             },
           },
+          id: '1',
+          name: 'Alice',
         };
 
         const renderer = renderFragment({
@@ -3972,10 +3998,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -3987,13 +4013,13 @@ describe.each([
         // suspends upon refetch
         const refetchVariables = {
           after: null,
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
           // The id here should correspond to the user id, and not the
           // feedback id from the query variables (i.e. `<feedbackid>`)
           id: '1',
           isViewerFriendLocal: true,
+          last: null,
           orderby: ['lastname'],
           scale: null,
         };
@@ -4006,8 +4032,8 @@ describe.each([
           data: initialUser,
           hasNext: true,
           hasPrevious: false,
-          refetchVariables,
           refetchQuery: paginationQuery,
+          refetchVariables,
         });
 
         // Mock network response
@@ -4015,8 +4041,6 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -4036,14 +4060,14 @@ describe.each([
                   startCursor: 'cursor:100',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
 
         // Assert fragment is rendered with new data
         const expectedUser = {
-          id: '1',
-          name: 'Alice',
           friends: {
             edges: [
               {
@@ -4063,21 +4087,23 @@ describe.each([
               startCursor: 'cursor:100',
             },
           },
+          id: '1',
+          name: 'Alice',
         };
         expectFragmentResults([
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -4094,10 +4120,10 @@ describe.each([
         expectFragmentResults([
           {
             data: initialUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -4109,11 +4135,11 @@ describe.each([
         // suspends upon refetch
         const refetchVariables = {
           after: null,
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
           id: '1',
           isViewerFriendLocal: true,
+          last: null,
           orderby: ['lastname'],
           scale: null,
         };
@@ -4126,8 +4152,8 @@ describe.each([
           data: initialUser,
           hasNext: true,
           hasPrevious: false,
-          refetchVariables,
           refetchQuery: paginationQuery,
+          refetchVariables,
         });
 
         // Mock network response
@@ -4135,8 +4161,6 @@ describe.each([
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -4156,14 +4180,14 @@ describe.each([
                   startCursor: 'cursor:100',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
 
         // Assert fragment is rendered with new data
         const expectedUser = {
-          id: '1',
-          name: 'Alice',
           friends: {
             edges: [
               {
@@ -4183,21 +4207,23 @@ describe.each([
               startCursor: 'cursor:100',
             },
           },
+          id: '1',
+          name: 'Alice',
         };
         expectFragmentResults([
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
           {
             data: expectedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -4214,29 +4240,27 @@ describe.each([
           loadNext(1);
         });
         const paginationVariables = {
-          id: '1',
           after: 'cursor:100',
-          first: 1,
           before: null,
-          last: null,
+          first: 1,
+          id: '1',
           isViewerFriendLocal: true,
+          last: null,
           orderby: ['lastname'],
           scale: null,
         };
         expectFragmentIsLoadingMore(renderer, 'forward', {
           data: expectedUser,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
 
         resolveQuery({
           data: {
             node: {
               __typename: 'User',
-              id: '1',
-              name: 'Alice',
               friends: {
                 edges: [
                   {
@@ -4250,12 +4274,14 @@ describe.each([
                   },
                 ],
                 pageInfo: {
-                  startCursor: 'cursor:200',
                   endCursor: 'cursor:200',
                   hasNextPage: true,
                   hasPreviousPage: true,
+                  startCursor: 'cursor:200',
                 },
               },
+              id: '1',
+              name: 'Alice',
             },
           },
         });
@@ -4296,20 +4322,166 @@ describe.each([
           {
             // First update has updated connection
             data: paginatedUser,
-            isLoadingNext: true,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: true,
+            isLoadingPrevious: false,
           },
           {
             // Second update sets isLoading flag back to false
             data: paginatedUser,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
+      });
+
+      it('resets `isLoading` to false, hen loadMore gets interrupted by refresh, and useLoadMore does not trigger a reset', () => {
+        RelayFeatureFlags.ENABLE_USE_PAGINATION_IS_LOADING_FIX = true;
+        renderFragment();
+        expectFragmentResults([
+          {
+            data: initialUser,
+            hasNext: true,
+            hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
+          },
+        ]);
+
+        TestRenderer.act(() => {
+          loadNext(1);
+        });
+
+        expectFragmentResults([
+          {
+            data: initialUser,
+            hasNext: true,
+            hasPrevious: false,
+            isLoadingNext: true,
+            isLoadingPrevious: false,
+          },
+        ]);
+        fetch.mockClear();
+
+        TestRenderer.act(() => {
+          refetch(
+            {
+              cursor: null,
+            },
+            {
+              fetchPolicy: 'network-only',
+            },
+          );
+        });
+
+        const refetchVariables = {
+          after: null,
+          before: null,
+          first: 1,
+          id: '1',
+          isViewerFriendLocal: false,
+          last: null,
+          orderby: ['name'],
+          scale: null,
+        };
+        paginationQuery = createOperationDescriptor(
+          gqlPaginationQuery,
+          refetchVariables,
+          {force: true},
+        );
+
+        const REFETCH_DATA = {
+          data: {
+            node: {
+              __typename: 'User',
+              friends: {
+                edges: [
+                  {
+                    cursor: 'cursor:100',
+                    node: {
+                      __typename: 'User',
+                      id: 'node:100',
+                      name: 'name:node:100',
+                      username: 'username:node:100',
+                    },
+                  },
+                ],
+                pageInfo: {
+                  endCursor: 'cursor:100',
+                  hasNextPage: true,
+                  hasPreviousPage: false,
+                  startCursor: 'cursor:100',
+                },
+              },
+              id: '1',
+              name: 'Alice',
+            },
+          },
+        };
+        resolveQuery(REFETCH_DATA);
+
+        const expectedUser = {
+          friends: {
+            edges: [
+              {
+                cursor: 'cursor:100',
+                node: {
+                  __typename: 'User',
+                  id: 'node:100',
+                  name: 'name:node:100',
+                  ...createFragmentRef('node:100', paginationQuery),
+                },
+              },
+            ],
+            pageInfo: {
+              endCursor: 'cursor:100',
+              hasNextPage: true,
+              hasPreviousPage: false,
+              startCursor: 'cursor:100',
+            },
+          },
+          id: '1',
+          name: 'Alice',
+        };
+
+        // loadNext gets interrupted by refetch, and `reset()` in useLoadMore triggers
+        expectFragmentLastResult({
+          data: expectedUser,
+          hasNext: true,
+          hasPrevious: false,
+          isLoadingNext: false,
+          isLoadingPrevious: false,
+        });
+
+        // loadNext gets interrupted by refetch, and `reset()` in useLoadMore doesn't trigger
+        // because fragmentIdentifier doesn't change
+        TestRenderer.act(() => {
+          loadNext(1);
+        });
+        TestRenderer.act(() => {
+          refetch(
+            {
+              cursor: null,
+            },
+            {
+              fetchPolicy: 'network-only',
+            },
+          );
+        });
+
+        resolveQuery(REFETCH_DATA);
+        expectFragmentLastResult({
+          data: expectedUser,
+          hasNext: true,
+          hasPrevious: false,
+          isLoadingNext: false,
+          isLoadingPrevious: false,
+        });
+
+        RelayFeatureFlags.ENABLE_USE_PAGINATION_IS_LOADING_FIX = false;
       });
     });
 
@@ -4325,7 +4497,7 @@ describe.each([
         `;
 
         // $FlowFixMe[prop-missing]
-        // $FlowFixMe[incompatible-type-arg]
+        // $FlowFixMe[incompatible-type]
         gqlFragment = graphql`
           fragment usePaginationFragmentTestStoryFragment on NonNodeStory
           @argumentDefinitions(
@@ -4352,8 +4524,6 @@ describe.each([
         environment.commitPayload(query, {
           nonNodeStory: {
             __typename: 'NonNodeStory',
-            id: 'a',
-            fetch_id: 'fetch:a',
             comments: {
               edges: [
                 {
@@ -4369,6 +4539,8 @@ describe.each([
                 hasNextPage: true,
               },
             },
+            fetch_id: 'fetch:a',
+            id: 'a',
           },
         });
       });
@@ -4377,7 +4549,6 @@ describe.each([
         const callback = jest.fn<[Error | null], void>();
         const renderer = renderFragment();
         const initialData = {
-          fetch_id: 'fetch:a',
           comments: {
             edges: [
               {
@@ -4393,14 +4564,15 @@ describe.each([
               hasNextPage: true,
             },
           },
+          fetch_id: 'fetch:a',
         };
         expectFragmentResults([
           {
             data: initialData,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
 
@@ -4408,24 +4580,22 @@ describe.each([
           loadNext(1, {onComplete: callback});
         });
         const paginationVariables = {
-          id: 'fetch:a',
-          cursor: 'edge:0',
           count: 1,
+          cursor: 'edge:0',
+          id: 'fetch:a',
         };
         expectFragmentIsLoadingMore(renderer, 'forward', {
           data: initialData,
+          gqlPaginationQuery,
           hasNext: true,
           hasPrevious: false,
           paginationVariables,
-          gqlPaginationQuery,
         });
         expect(callback).toBeCalledTimes(0);
 
         resolveQuery({
           data: {
             fetch__NonNodeStory: {
-              id: 'a',
-              fetch_id: 'fetch:a',
               comments: {
                 edges: [
                   {
@@ -4441,6 +4611,8 @@ describe.each([
                   hasNextPage: true,
                 },
               },
+              fetch_id: 'fetch:a',
+              id: 'a',
             },
           },
         });
@@ -4468,18 +4640,18 @@ describe.each([
           {
             // First update has updated connection
             data: expectedData,
-            isLoadingNext: true,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: true,
+            isLoadingPrevious: false,
           },
           {
             // Second update sets isLoading flag back to false
             data: expectedData,
-            isLoadingNext: false,
-            isLoadingPrevious: false,
             hasNext: true,
             hasPrevious: false,
+            isLoadingNext: false,
+            isLoadingPrevious: false,
           },
         ]);
         expect(callback).toBeCalledTimes(1);

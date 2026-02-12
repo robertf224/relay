@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<c1228fd59ee287554b787759113a36fd>>
+ * @generated SignedSource<<17bf7268f38390fcc9a3116dd67113c2>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -37,12 +37,12 @@ import {all_astrological_signs as queryAllAstrologicalSignsResolverType} from ".
   rootKey: QueryAllAstrologicalSignsResolver$key,
   args: void,
   context: TestResolverContextType,
-) => ?$ReadOnlyArray<{|
+) => ?ReadonlyArray<{|
   +id: DataID,
 |}>);
 export type RelayReaderRequiredFieldsTest27Query$variables = {||};
 export type RelayReaderRequiredFieldsTest27Query$data = {|
-  +all_astrological_signs: $ReadOnlyArray<{|
+  +all_astrological_signs: ReadonlyArray<{|
     +name: ?string,
   |}>,
 |};
@@ -85,7 +85,7 @@ return {
             },
             "kind": "RelayResolver",
             "name": "all_astrological_signs",
-            "resolverModule": require('./../resolvers/QueryAllAstrologicalSignsResolver').all_astrological_signs,
+            "resolverModule": require('../resolvers/QueryAllAstrologicalSignsResolver').all_astrological_signs,
             "path": "all_astrological_signs"
           },
           "linkedField": {
@@ -106,15 +106,14 @@ return {
                 },
                 "kind": "RelayResolver",
                 "name": "name",
-                "resolverModule": require('./../resolvers/AstrologicalSignNameResolver').name,
+                "resolverModule": require('../resolvers/AstrologicalSignNameResolver').name,
                 "path": "all_astrological_signs.name"
               }
             ],
             "storageKey": null
           }
         },
-        "action": "THROW",
-        "path": "all_astrological_signs"
+        "action": "THROW"
       }
     ],
     "type": "Query",

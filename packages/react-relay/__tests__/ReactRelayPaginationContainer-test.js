@@ -102,6 +102,7 @@ describe('ReactRelayPaginationContainer', () => {
           id
           __typename
           ...ReactRelayPaginationContainerTestUserFragment
+            @dangerously_unaliased_fixme
             @arguments(isViewerFriendLocal: $isViewerFriend, orderby: $orderby)
         }
       }
@@ -343,10 +344,8 @@ describe('ReactRelayPaginationContainer', () => {
     expect(environment.subscribe.mock.calls[0][0]).toEqual({
       data: expect.any(Object),
       isMissingData: false,
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       seenRecords: expect.any(Object),
       selector: createReaderSelector(
@@ -389,7 +388,6 @@ describe('ReactRelayPaginationContainer', () => {
           friends: null, // set to null
         },
         seenRecords: {},
-        relayResolverErrors: [],
       });
     });
 
@@ -459,10 +457,8 @@ describe('ReactRelayPaginationContainer', () => {
     expect(environment.subscribe.mock.calls[0][0]).toEqual({
       data: expect.any(Object),
       isMissingData: false,
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       seenRecords: expect.any(Object),
       selector: createReaderSelector(
@@ -530,10 +526,8 @@ describe('ReactRelayPaginationContainer', () => {
     expect(environment.subscribe.mock.calls[0][0]).toEqual({
       data: expect.any(Object),
       isMissingData: false,
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       seenRecords: expect.any(Object),
       selector: createReaderSelector(
@@ -636,10 +630,8 @@ describe('ReactRelayPaginationContainer', () => {
     expect(environment.subscribe.mock.calls[0][0]).toEqual({
       data: expect.any(Object),
       isMissingData: false,
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       seenRecords: expect.any(Object),
       selector: createReaderSelector(
@@ -824,6 +816,7 @@ describe('ReactRelayPaginationContainer', () => {
         node(id: $id) {
           id
           ...ReactRelayPaginationContainerTestNoConnectionUserFragment
+            @dangerously_unaliased_fixme
         }
       }
     `;
@@ -879,6 +872,7 @@ describe('ReactRelayPaginationContainer', () => {
         node(id: $id) {
           id
           ...ReactRelayPaginationContainerTestNoConnectionOnFragmentUserFragment
+            @dangerously_unaliased_fixme
         }
       }
     `;

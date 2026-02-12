@@ -17,14 +17,15 @@ use common::Diagnostic;
 use common::DiagnosticsResult;
 use common::Location;
 use common::SourceLocationKey;
+use hermes_estree::_Literal;
+use hermes_estree::Declaration;
 use hermes_estree::ImportDeclarationSpecifier;
 use hermes_estree::Visitor;
-use hermes_estree::_Literal;
 use rustc_hash::FxHashMap;
 use serde::Serialize;
 
-use crate::to_location;
 use crate::SchemaGenerationError;
+use crate::to_location;
 pub type JSModules = FxHashMap<StringKey, ModuleResolutionKey>;
 pub struct ImportExportVisitor {
     imports: JSModules,
@@ -52,7 +53,7 @@ impl fmt::Display for JSImportType {
         match self {
             JSImportType::Default => write!(f, "default"),
             JSImportType::Namespace(_) => write!(f, "namespace"),
-            JSImportType::Named(key) => write!(f, "{}", key),
+            JSImportType::Named(key) => write!(f, "{key}"),
         }
     }
 }
@@ -139,8 +140,12 @@ impl Visitor<'_> for ImportExportVisitor {
     }
 
     fn visit_export_named_declaration(&mut self, ast: &'_ hermes_estree::ExportNamedDeclaration) {
-        if let Some(hermes_estree::Declaration::TypeAlias(node)) = &ast.declaration {
-            let name = (&node.id.name).intern();
+        let maybe_name = ast.declaration.as_ref().and_then(|decl| match decl {
+            Declaration::TypeAlias(node) => Some((&node.id.name).intern()),
+            Declaration::OpaqueType(node) => Some((&node.id.name).intern()),
+            _ => None,
+        });
+        if let Some(name) = maybe_name {
             self.exports.insert(
                 name,
                 ModuleResolutionKey {

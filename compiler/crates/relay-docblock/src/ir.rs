@@ -18,7 +18,6 @@ use common::NamedItem;
 use common::ObjectName;
 use common::Span;
 use common::WithLocation;
-use docblock_shared::ResolverSourceHash;
 use docblock_shared::FRAGMENT_KEY_ARGUMENT_NAME;
 use docblock_shared::GENERATED_FRAGMENT_ARGUMENT_NAME;
 use docblock_shared::HAS_OUTPUT_TYPE_ARGUMENT_NAME;
@@ -28,11 +27,16 @@ use docblock_shared::INJECT_FRAGMENT_DATA_ARGUMENT_NAME;
 use docblock_shared::LIVE_ARGUMENT_NAME;
 use docblock_shared::RELAY_RESOLVER_DIRECTIVE_NAME;
 use docblock_shared::RELAY_RESOLVER_MODEL_DIRECTIVE_NAME;
+use docblock_shared::RELAY_RESOLVER_MODEL_GENERATED_ID_FIELD_DIRECTIVE_NAME;
 use docblock_shared::RELAY_RESOLVER_MODEL_INSTANCE_FIELD;
 use docblock_shared::RELAY_RESOLVER_SOURCE_HASH;
 use docblock_shared::RELAY_RESOLVER_SOURCE_HASH_VALUE;
 use docblock_shared::RELAY_RESOLVER_WEAK_OBJECT_DIRECTIVE;
+use docblock_shared::RESOLVER_PROPERTY_LOOKUP_NAME;
 use docblock_shared::RESOLVER_VALUE_SCALAR_NAME;
+use docblock_shared::RETURN_FRAGMENT_ARGUMENT_NAME;
+use docblock_shared::ResolverSourceHash;
+use docblock_shared::TYPE_CONFIRMED_ARGUMENT_NAME;
 use graphql_ir::FragmentDefinitionName;
 use graphql_syntax::BooleanNode;
 use graphql_syntax::ConstantArgument;
@@ -64,13 +68,13 @@ use relay_config::SchemaConfig;
 use relay_schema::CUSTOM_SCALAR_DIRECTIVE_NAME;
 use relay_schema::EXPORT_NAME_CUSTOM_SCALAR_ARGUMENT_NAME;
 use relay_schema::PATH_CUSTOM_SCALAR_ARGUMENT_NAME;
-use schema::suggestion_list::GraphQLSuggestions;
 use schema::InterfaceID;
 use schema::Object;
 use schema::ObjectID;
 use schema::SDLSchema;
 use schema::Schema;
 use schema::Type;
+use schema::suggestion_list::GraphQLSuggestions;
 
 use crate::errors::ErrorMessagesWithData;
 use crate::errors::SchemaValidationErrorMessages;
@@ -371,6 +375,9 @@ trait ResolverIr: Sized {
     fn named_import(&self) -> Option<StringKey>;
     fn source_hash(&self) -> ResolverSourceHash;
     fn semantic_non_null(&self) -> Option<ConstantDirective>;
+    fn type_confirmed(&self) -> bool;
+    fn property_lookup_name(&self) -> Option<WithLocation<StringKey>>;
+    fn return_fragment(&self) -> Option<WithLocation<FragmentDefinitionName>>;
 
     fn to_graphql_schema_ast(
         self,
@@ -487,6 +494,13 @@ trait ResolverIr: Sized {
                 root_fragment.fragment.map(|x| x.0),
             ));
 
+            if self.type_confirmed() {
+                arguments.push(true_argument(
+                    TYPE_CONFIRMED_ARGUMENT_NAME.0,
+                    Location::generated(),
+                ));
+            }
+
             if root_fragment.generated {
                 arguments.push(true_argument(
                     GENERATED_FRAGMENT_ARGUMENT_NAME.0,
@@ -505,7 +519,19 @@ trait ResolverIr: Sized {
                 }
             }
         }
-
+        let property_lookup = self.property_lookup_name();
+        if let Some(property_lookup) = property_lookup {
+            arguments.push(string_argument(
+                RESOLVER_PROPERTY_LOOKUP_NAME.0,
+                property_lookup,
+            ));
+        }
+        if let Some(return_fragment) = self.return_fragment() {
+            arguments.push(string_argument(
+                RETURN_FRAGMENT_ARGUMENT_NAME.0,
+                return_fragment.map(|x| x.0),
+            ));
+        }
         let schema = project_config.schema;
 
         if let Some(output_type) = self.output_type() {
@@ -523,7 +549,7 @@ trait ResolverIr: Sized {
                         }
                         _ => None,
                     };
-                    let mut is_edge_to_strong_object = fields.map_or(false, |fields| {
+                    let mut is_edge_to_strong_object = fields.is_some_and(|fields| {
                         fields.iter().any(|id| {
                             schema.field(*id).name.item
                                 == project_config.schema_config.node_interface_id_field
@@ -790,6 +816,7 @@ trait ResolverTypeDefinitionIr: ResolverIr {
                             }
                         }),
                         directives: vec![],
+                        description: None,
                         span,
                     })
                     .collect::<Vec<_>>(),
@@ -803,12 +830,17 @@ pub struct TerseRelayResolverIr {
     pub field: FieldDefinition,
     pub type_: WithLocation<StringKey>,
     pub root_fragment: Option<WithLocation<FragmentDefinitionName>>,
+    pub return_fragment: Option<WithLocation<FragmentDefinitionName>>,
     pub deprecated: Option<IrField>,
     pub semantic_non_null: Option<ConstantDirective>,
     pub live: Option<UnpopulatedIrField>,
     pub location: Location,
     pub fragment_arguments: Option<Vec<Argument>>,
     pub source_hash: ResolverSourceHash,
+    /// Indicates that the extraction method used has already validated that the
+    /// implementaiton matches the GraphQL types.
+    pub type_confirmed: bool,
+    pub property_lookup_name: Option<WithLocation<StringKey>>,
 }
 
 impl ResolverIr for TerseRelayResolverIr {
@@ -910,6 +942,18 @@ impl ResolverIr for TerseRelayResolverIr {
     fn source_hash(&self) -> ResolverSourceHash {
         self.source_hash
     }
+
+    fn type_confirmed(&self) -> bool {
+        self.type_confirmed
+    }
+
+    fn property_lookup_name(&self) -> Option<WithLocation<StringKey>> {
+        self.property_lookup_name
+    }
+
+    fn return_fragment(&self) -> Option<WithLocation<FragmentDefinitionName>> {
+        self.return_fragment
+    }
 }
 
 impl ResolverTypeDefinitionIr for TerseRelayResolverIr {
@@ -939,6 +983,7 @@ pub struct LegacyVerboseResolverIr {
     pub field: FieldDefinitionStub,
     pub on: On,
     pub root_fragment: Option<WithLocation<FragmentDefinitionName>>,
+    pub return_fragment: Option<WithLocation<FragmentDefinitionName>>,
     pub output_type: Option<OutputType>,
     pub description: Option<WithLocation<StringKey>>,
     pub hack_source: Option<WithLocation<StringKey>>,
@@ -1098,6 +1143,18 @@ impl ResolverIr for LegacyVerboseResolverIr {
     fn source_hash(&self) -> ResolverSourceHash {
         self.source_hash
     }
+
+    fn type_confirmed(&self) -> bool {
+        false
+    }
+
+    fn property_lookup_name(&self) -> Option<WithLocation<StringKey>> {
+        None
+    }
+
+    fn return_fragment(&self) -> Option<WithLocation<FragmentDefinitionName>> {
+        self.return_fragment
+    }
 }
 
 impl ResolverTypeDefinitionIr for LegacyVerboseResolverIr {
@@ -1139,6 +1196,7 @@ pub struct StrongObjectIr {
     /// The interfaces which the newly-created object implements
     pub implements_interfaces: Vec<Identifier>,
     pub source_hash: ResolverSourceHash,
+    pub type_confirmed: bool,
 }
 
 impl StrongObjectIr {
@@ -1156,7 +1214,14 @@ impl StrongObjectIr {
                     exclamation: dummy_token(span),
                 })),
                 arguments: None,
-                directives: vec![],
+                directives: vec![ConstantDirective {
+                    span,
+                    at: dummy_token(span),
+                    name: string_key_as_identifier(
+                        RELAY_RESOLVER_MODEL_GENERATED_ID_FIELD_DIRECTIVE_NAME.0,
+                    ),
+                    arguments: None,
+                }],
                 description: None,
                 hack_source: None,
                 span,
@@ -1164,7 +1229,7 @@ impl StrongObjectIr {
             generate_model_instance_field(
                 schema_config.unselectable_directive_name,
                 RESOLVER_VALUE_SCALAR_NAME.0,
-                None,
+                self.description.map(as_string_node),
                 None,
                 self.type_directives(schema_config),
                 self.location(),
@@ -1181,6 +1246,7 @@ impl StrongObjectIr {
             }],
             fields: Some(List::generated(fields)),
             span,
+            description: self.description.map(as_string_node),
         })
     }
 }
@@ -1243,6 +1309,17 @@ impl ResolverIr for StrongObjectIr {
     fn source_hash(&self) -> ResolverSourceHash {
         self.source_hash
     }
+    fn type_confirmed(&self) -> bool {
+        self.type_confirmed
+    }
+
+    fn property_lookup_name(&self) -> Option<WithLocation<StringKey>> {
+        None
+    }
+
+    fn return_fragment(&self) -> Option<WithLocation<FragmentDefinitionName>> {
+        None
+    }
 }
 
 /// Relay Resolver docblock representing a "model" type for a weak object
@@ -1260,6 +1337,7 @@ pub struct WeakObjectIr {
     /// The interfaces which the newly-created object implements
     pub implements_interfaces: Vec<Identifier>,
     pub source_hash: ResolverSourceHash,
+    pub type_confirmed: bool,
 }
 
 impl WeakObjectIr {
@@ -1316,6 +1394,7 @@ impl WeakObjectIr {
                 location,
             )])),
             span,
+            description: self.description.map(as_string_node),
         })
     }
 
@@ -1358,6 +1437,7 @@ impl WeakObjectIr {
                 ])),
             }],
             span,
+            description: None,
         })
     }
 
@@ -1426,6 +1506,18 @@ impl ResolverIr for WeakObjectIr {
 
     fn source_hash(&self) -> ResolverSourceHash {
         self.source_hash
+    }
+
+    fn type_confirmed(&self) -> bool {
+        self.type_confirmed
+    }
+
+    fn property_lookup_name(&self) -> Option<WithLocation<StringKey>> {
+        None
+    }
+
+    fn return_fragment(&self) -> Option<WithLocation<FragmentDefinitionName>> {
+        None
     }
 }
 

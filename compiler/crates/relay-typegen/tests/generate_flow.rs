@@ -20,15 +20,15 @@ use common::SourceLocationKey;
 use fixture_tests::Fixture;
 use fnv::FnvBuildHasher;
 use fnv::FnvHashMap;
-use graphql_ir::build_ir_in_relay_mode;
 use graphql_ir::OperationDefinitionName;
 use graphql_ir::Program;
+use graphql_ir::build_ir_in_relay_mode;
 use graphql_syntax::parse_executable;
 use graphql_test_helpers::diagnostics_to_sorted_string;
 use indexmap::IndexMap;
 use regex::Regex;
-use relay_codegen::print_provided_variables;
 use relay_codegen::JsModuleFormat;
+use relay_codegen::print_provided_variables;
 use relay_config::CustomType;
 use relay_config::CustomTypeImport;
 use relay_config::ProjectConfig;
@@ -68,7 +68,6 @@ pub async fn transform_fixture(fixture: &Fixture<'_>) -> Result<String, String> 
             .into_iter()
             .collect(),
         },
-        enable_relay_resolver_transform: true,
         relay_resolver_enable_interface_output_type: FeatureFlag::Enabled,
         actor_change_support: FeatureFlag::Enabled,
         ..Default::default()
@@ -140,6 +139,7 @@ pub async fn transform_fixture(fixture: &Fixture<'_>) -> Result<String, String> 
         Arc::new(ConsoleLogger),
         None,
         None,
+        vec![],
     )
     .map_err(|diagnostics| diagnostics_to_sorted_string(source, &diagnostics))?;
 

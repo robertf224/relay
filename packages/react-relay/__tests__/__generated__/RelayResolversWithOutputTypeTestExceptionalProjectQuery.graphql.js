@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<0e2d032ecd3ec51cf764e966e1ee6164>>
+ * @generated SignedSource<<b84552aa7b56781b87c2e54664766888>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -35,7 +35,7 @@ import type { Query__todos$normalization } from "./../../../relay-runtime/store/
 export type RelayResolversWithOutputTypeTestExceptionalProjectQuery$variables = {||};
 export type RelayResolversWithOutputTypeTestExceptionalProjectQuery$data = {|
   +todos: ?{|
-    +edges: ?$ReadOnlyArray<?{|
+    +edges: ?ReadonlyArray<?{|
       +node: ?{|
         +$fragmentSpreads: RelayResolversWithOutputTypeTestFragment$fragmentType,
       |},
@@ -103,7 +103,7 @@ return {
           "fragment": null,
           "kind": "RelayLiveResolver",
           "name": "todos",
-          "resolverModule": require('./../../../relay-runtime/store/__tests__/resolvers/QueryTodos').todos,
+          "resolverModule": require('../../../relay-runtime/store/__tests__/resolvers/QueryTodos').todos,
           "path": "todos",
           "normalizationInfo": {
             "kind": "OutputType",

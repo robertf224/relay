@@ -7,8 +7,8 @@
 
 use fnv::FnvHashMap;
 use fnv::FnvHashSet;
-use intern::string_key::StringKey;
 use intern::Lookup;
+use intern::string_key::StringKey;
 use rayon::iter::IntoParallelIterator;
 use rayon::iter::ParallelIterator;
 use schema::FieldID;
@@ -16,8 +16,8 @@ use schema::SDLSchema;
 use schema::Schema;
 use schema::Type;
 
-use crate::calculate_hash;
 use crate::Printer;
+use crate::calculate_hash;
 
 pub struct ShardPrinter<'schema> {
     schema: &'schema SDLSchema,
@@ -77,7 +77,7 @@ impl<'schema> TypedShardPrinter<'schema> {
         if let Some(t) = type_ {
             let object_id = t
                 .get_object_id()
-                .unwrap_or_else(|| panic!("Expected object type, got {:?}", t));
+                .unwrap_or_else(|| panic!("Expected object type, got {t:?}"));
             let object = self.schema.object(object_id);
             let mut printer = Printer::new(self.schema, &mut result);
             if self.is_start {

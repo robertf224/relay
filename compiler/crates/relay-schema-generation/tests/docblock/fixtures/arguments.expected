@@ -95,6 +95,7 @@ Field(
                                 ),
                                 default_value: None,
                                 directives: [],
+                                description: None,
                                 span: 475:485,
                             },
                         ],
@@ -114,6 +115,7 @@ Field(
                 item: "Cat",
             },
             root_fragment: None,
+            return_fragment: None,
             deprecated: None,
             semantic_non_null: None,
             live: None,
@@ -122,11 +124,13 @@ Field(
             source_hash: ResolverSourceHash(
                 "9eb0075d1ca5f38ce3ae8a364b4fb1be",
             ),
+            type_confirmed: true,
+            property_lookup_name: None,
         },
     ),
 )
 extend type Cat {
-  favorite_page(id: Float!): ClientPage @relay_resolver(fragment_name: "Cat____relay_model_instance", generated_fragment: true, inject_fragment_data: "__relay_model_instance", has_output_type: true, import_name: "favorite_page", import_path: "module.js") @resolver_source_hash(value: "9eb0075d1ca5f38ce3ae8a364b4fb1be")
+  favorite_page(id: Float!): ClientPage @relay_resolver(fragment_name: "Cat____relay_model_instance", generated_fragment: true, inject_fragment_data: "__relay_model_instance", type_confirmed: true, has_output_type: true, import_name: "favorite_page", import_path: "module.js") @resolver_source_hash(value: "9eb0075d1ca5f38ce3ae8a364b4fb1be")
 }
 
 
@@ -207,6 +211,7 @@ Field(
                                 ),
                                 default_value: None,
                                 directives: [],
+                                description: None,
                                 span: 582:596,
                             },
                         ],
@@ -226,6 +231,7 @@ Field(
                 item: "Cat",
             },
             root_fragment: None,
+            return_fragment: None,
             deprecated: None,
             semantic_non_null: None,
             live: None,
@@ -234,11 +240,13 @@ Field(
             source_hash: ResolverSourceHash(
                 "9eb0075d1ca5f38ce3ae8a364b4fb1be",
             ),
+            type_confirmed: true,
+            property_lookup_name: None,
         },
     ),
 )
 extend type Cat {
-  all_pages(limit: Float): [ClientPage!] @relay_resolver(fragment_name: "Cat____relay_model_instance", generated_fragment: true, inject_fragment_data: "__relay_model_instance", has_output_type: true, import_name: "all_pages", import_path: "module.js") @resolver_source_hash(value: "9eb0075d1ca5f38ce3ae8a364b4fb1be")
+  all_pages(limit: Float): [ClientPage!] @relay_resolver(fragment_name: "Cat____relay_model_instance", generated_fragment: true, inject_fragment_data: "__relay_model_instance", type_confirmed: true, has_output_type: true, import_name: "all_pages", import_path: "module.js") @resolver_source_hash(value: "9eb0075d1ca5f38ce3ae8a364b4fb1be")
 }
 
 
@@ -269,11 +277,12 @@ Type(
             source_hash: ResolverSourceHash(
                 "9eb0075d1ca5f38ce3ae8a364b4fb1be",
             ),
+            type_confirmed: true,
         },
     ),
 )
 type Cat @__RelayResolverModel {
-  id: ID!
+  id: ID! @__RelayResolverModelGeneratedIDField
   __relay_model_instance: RelayResolverValue! @relay_resolver(generated_fragment: true, fragment_name: "Cat__id", import_name: "Cat", import_path: "module.js", inject_fragment_data: "id") @resolver_source_hash(value: "9eb0075d1ca5f38ce3ae8a364b4fb1be") @unselectable(reason: "This field is intended only for Relay's internal use")
 }
 
@@ -298,6 +307,7 @@ Type(
             source_hash: ResolverSourceHash(
                 "9eb0075d1ca5f38ce3ae8a364b4fb1be",
             ),
+            type_confirmed: true,
         },
     ),
 )

@@ -104,6 +104,7 @@ describe('ReactRelayRefetchContainer', () => {
       ) {
         node(id: $id) {
           ...ReactRelayRefetchContainerTestUserFragment
+            @dangerously_unaliased_fixme
             @arguments(cond: $condGlobal)
         }
       }
@@ -112,6 +113,7 @@ describe('ReactRelayRefetchContainer', () => {
       query ReactRelayRefetchContainerTestUserQuery($id: ID!) {
         node(id: $id) {
           ...ReactRelayRefetchContainerTestUserFragment
+            @dangerously_unaliased_fixme
         }
       }
     `;
@@ -279,10 +281,8 @@ describe('ReactRelayRefetchContainer', () => {
         name: 'Zuck',
       },
       isMissingData: false,
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       seenRecords: expect.any(Object),
       selector: createReaderSelector(
@@ -319,7 +319,6 @@ describe('ReactRelayRefetchContainer', () => {
           name: 'Mark', // !== 'Zuck'
         },
         seenRecords: {},
-        relayResolverErrors: [],
       });
     });
 
@@ -382,10 +381,8 @@ describe('ReactRelayRefetchContainer', () => {
         name: 'Joe',
       },
       isMissingData: false,
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       seenRecords: expect.any(Object),
       selector: createReaderSelector(
@@ -443,10 +440,8 @@ describe('ReactRelayRefetchContainer', () => {
         // Name is excluded since value of cond is now false
       },
       isMissingData: false,
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       seenRecords: expect.any(Object),
       selector: createReaderSelector(
@@ -531,10 +526,8 @@ describe('ReactRelayRefetchContainer', () => {
         id: '4',
         // Name is excluded since value of cond is now false
       },
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       isMissingData: false,
       seenRecords: expect.any(Object),

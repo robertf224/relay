@@ -19,10 +19,10 @@ use common::ScalarName;
 use common::Span;
 use common::WithLocation;
 use errors::par_try_map;
-use errors::try2;
-use errors::try3;
 use errors::try_all;
 use errors::try_map;
+use errors::try2;
+use errors::try3;
 use graphql_syntax::DefaultValue;
 use graphql_syntax::DirectiveLocation;
 use graphql_syntax::Identifier;
@@ -31,14 +31,12 @@ use graphql_syntax::OperationKind;
 use graphql_syntax::Token;
 use graphql_syntax::TokenKind;
 use indexmap::IndexMap;
+use intern::Lookup;
 use intern::string_key::Intern;
 use intern::string_key::StringKey;
 use intern::string_key::StringKeyMap;
 use intern::string_key::StringKeySet;
-use intern::Lookup;
 use lazy_static::lazy_static;
-use schema::suggestion_list;
-use schema::suggestion_list::GraphQLSuggestions;
 use schema::ArgumentDefinitions;
 use schema::Enum;
 use schema::FieldID;
@@ -48,15 +46,18 @@ use schema::Scalar;
 use schema::Schema;
 use schema::Type;
 use schema::TypeReference;
+use schema::suggestion_list;
+use schema::suggestion_list::GraphQLSuggestions;
 
 use crate::constants::ARGUMENT_DEFINITION;
+use crate::errors::MachineMetadataKey;
 use crate::errors::ValidationMessage;
 use crate::errors::ValidationMessageWithData;
 use crate::ir::*;
-use crate::signatures::build_signatures;
 use crate::signatures::FragmentSignature;
 use crate::signatures::FragmentSignatures;
 use crate::signatures::ProvidedVariableMetadata;
+use crate::signatures::build_signatures;
 
 lazy_static! {
     static ref TYPENAME_FIELD_NAME: StringKey = "__typename".intern();
@@ -92,6 +93,11 @@ pub struct BuilderOptions {
     /// defined in the same program.
     pub allow_undefined_fragment_spreads: bool,
 
+    /// Do not error when an abstract fragment spread's type has no overlap with the
+    /// abstract parent type. This allows old definitions to still be built after
+    /// a type no longer implements an interface or is removed from a union.
+    pub allow_non_overlapping_abstract_spreads: bool,
+
     /// The semantic of defining variables on a fragment definition.
     pub fragment_variables_semantic: FragmentVariablesSemantic,
 
@@ -121,6 +127,7 @@ pub fn build_ir_in_relay_mode(
 ) -> DiagnosticsResult<Vec<ExecutableDefinition>> {
     let builder_options = BuilderOptions {
         allow_undefined_fragment_spreads: false,
+        allow_non_overlapping_abstract_spreads: false,
         fragment_variables_semantic: FragmentVariablesSemantic::PassedValue,
         relay_mode: Some(RelayMode),
         default_anonymous_operation_name: None,
@@ -139,6 +146,7 @@ pub fn build_ir(
         definitions,
         &BuilderOptions {
             allow_undefined_fragment_spreads: false,
+            allow_non_overlapping_abstract_spreads: false,
             fragment_variables_semantic: FragmentVariablesSemantic::PassedValue,
             relay_mode: None,
             default_anonymous_operation_name: None,
@@ -174,6 +182,7 @@ pub fn build_type_annotation(
         location,
         &BuilderOptions {
             allow_undefined_fragment_spreads: false,
+            allow_non_overlapping_abstract_spreads: false,
             fragment_variables_semantic: FragmentVariablesSemantic::Disabled,
             relay_mode: None,
             default_anonymous_operation_name: None,
@@ -196,6 +205,7 @@ pub fn build_directive(
         location,
         &BuilderOptions {
             allow_undefined_fragment_spreads: false,
+            allow_non_overlapping_abstract_spreads: false,
             fragment_variables_semantic: FragmentVariablesSemantic::Disabled,
             relay_mode: None,
             default_anonymous_operation_name: None,
@@ -219,6 +229,7 @@ pub fn build_constant_value(
         location,
         &BuilderOptions {
             allow_undefined_fragment_spreads: false,
+            allow_non_overlapping_abstract_spreads: false,
             fragment_variables_semantic: FragmentVariablesSemantic::Disabled,
             relay_mode: None,
             default_anonymous_operation_name: None,
@@ -240,6 +251,7 @@ pub fn build_variable_definitions(
         location,
         &BuilderOptions {
             allow_undefined_fragment_spreads: false,
+            allow_non_overlapping_abstract_spreads: false,
             fragment_variables_semantic: FragmentVariablesSemantic::Disabled,
             relay_mode: None,
             default_anonymous_operation_name: None,
@@ -247,6 +259,29 @@ pub fn build_variable_definitions(
         },
     );
     builder.build_variable_definitions(definitions)
+}
+
+pub fn build_directives(
+    schema: &SDLSchema,
+    directives: &[graphql_syntax::Directive],
+    directive_location: DirectiveLocation,
+    location: Location,
+) -> DiagnosticsResult<Vec<Directive>> {
+    let signatures = Default::default();
+    let mut builder = Builder::new(
+        schema,
+        &signatures,
+        location,
+        &BuilderOptions {
+            allow_undefined_fragment_spreads: false,
+            allow_non_overlapping_abstract_spreads: false,
+            fragment_variables_semantic: FragmentVariablesSemantic::Disabled,
+            relay_mode: None,
+            default_anonymous_operation_name: None,
+            allow_custom_scalar_literals: true, // for compatibility
+        },
+    );
+    builder.build_directives(directives, directive_location)
 }
 
 // Helper Types
@@ -406,15 +441,15 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
         let directives = self.build_directives(&operation.directives, kind.into());
         let operation_type_reference = TypeReference::Named(operation_type);
         // assert the subscription only contains one selection
-        if let OperationKind::Subscription = kind {
-            if operation.selections.items.len() != 1 {
-                return Err(vec![Diagnostic::error(
-                    ValidationMessage::GenerateSubscriptionNameSingleSelectionItem {
-                        subscription_name: name.value,
-                    },
-                    operation.location,
-                )]);
-            }
+        if let OperationKind::Subscription = kind
+            && operation.selections.items.len() != 1
+        {
+            return Err(vec![Diagnostic::error(
+                ValidationMessage::GenerateSubscriptionNameSingleSelectionItem {
+                    subscription_name: name.value,
+                },
+                operation.location,
+            )]);
         }
         let selections =
             self.build_selections(&operation.selections.items, &[operation_type_reference]);
@@ -576,7 +611,10 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
                             },
                             self.location.with_span(named_type.name.span),
                         )
-                        .metadata_for_machine("unknown_type", named_type.name.value.lookup()),
+                        .metadata_for_machine(
+                            MachineMetadataKey::UnknownType,
+                            named_type.name.value.lookup(),
+                        ),
                     ]),
                 }
             }
@@ -766,6 +804,7 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
                 return Ok(FragmentSpread {
                     fragment: spread_name_with_location,
                     arguments: Vec::new(),
+                    signature: None,
                     directives,
                 });
             }
@@ -818,6 +857,7 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
             return Ok(FragmentSpread {
                 fragment: spread_name_with_location,
                 arguments: Vec::new(),
+                signature: Some(signature.clone()),
                 directives,
             });
         }
@@ -850,6 +890,7 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
             return Ok(FragmentSpread {
                 fragment: spread_name_with_location,
                 arguments: spread_arguments,
+                signature: Some(signature.clone()),
                 directives,
             });
         }
@@ -911,6 +952,7 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
         Ok(FragmentSpread {
             fragment: spread_name_with_location,
             arguments,
+            signature: Some(signature.clone()),
             directives,
         })
     }
@@ -949,7 +991,10 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
                                 },
                                 self.location.with_span(span),
                             )
-                            .metadata_for_machine("unknown_type", type_name.lookup()),
+                            .metadata_for_machine(
+                                MachineMetadataKey::UnknownType,
+                                type_name.lookup(),
+                            ),
                         ]);
                     }
                 }
@@ -957,19 +1002,18 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
             None => None,
         };
 
-        if let Some((type_condition, span)) = type_condition_with_span {
-            if let Some(parent_type) =
+        if let Some((type_condition, span)) = type_condition_with_span
+            && let Some(parent_type) =
                 self.find_conflicting_parent_type(parent_types, type_condition)
-            {
-                // no possible overlap
-                return Err(vec![Diagnostic::error(
-                    ValidationMessage::InvalidInlineFragmentTypeCondition {
-                        parent_type: self.schema.get_type_name(parent_type.inner()),
-                        type_condition: self.schema.get_type_name(type_condition),
-                    },
-                    self.location.with_span(span),
-                )]);
-            }
+        {
+            // no possible overlap
+            return Err(vec![Diagnostic::error(
+                ValidationMessage::InvalidInlineFragmentTypeCondition {
+                    parent_type: self.schema.get_type_name(parent_type.inner()),
+                    type_condition: self.schema.get_type_name(type_condition),
+                },
+                self.location.with_span(span),
+            )]);
         }
 
         let type_condition = type_condition_with_span.map(|(type_, _)| type_);
@@ -1013,16 +1057,26 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
         ) {
             Some(field_id) => field_id,
             None => {
-                return Err(vec![Diagnostic::error_with_data(
-                    ValidationMessageWithData::UnknownField {
-                        type_: self.schema.get_type_name(parent_type.inner()),
-                        field: field.name.value,
-                        suggestions: self
-                            .suggestions
-                            .field_name_suggestion(Some(parent_type.inner()), field.name.value),
-                    },
-                    self.location.with_span(span),
-                )]);
+                return Err(vec![
+                    Diagnostic::error_with_data(
+                        ValidationMessageWithData::UnknownField {
+                            type_: self.schema.get_type_name(parent_type.inner()),
+                            field: field.name.value,
+                            suggestions: self
+                                .suggestions
+                                .field_name_suggestion(Some(parent_type.inner()), field.name.value),
+                        },
+                        self.location.with_span(span),
+                    )
+                    .metadata_for_machine(
+                        MachineMetadataKey::UnknownField,
+                        field.name.value.lookup(),
+                    )
+                    .metadata_for_machine(
+                        MachineMetadataKey::ParentType,
+                        self.schema.get_type_name(parent_type.inner()).lookup(),
+                    ),
+                ]);
             }
         };
         let field_definition = self.schema.field(field_id);
@@ -1049,8 +1103,10 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
                 }
             },
         );
-        let selections =
-            self.build_selections(&field.selections.items, &[field_definition.type_.clone()]);
+        let selections = self.build_selections(
+            &field.selections.items,
+            std::slice::from_ref(&field_definition.type_),
+        );
         let directives = self.build_directives(&field.directives, DirectiveLocation::Field);
         let (arguments, selections, directives) = try3(arguments, selections, directives)?;
         Ok(LinkedField {
@@ -1084,16 +1140,26 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
         ) {
             Some(field_id) => field_id,
             None => {
-                return Err(vec![Diagnostic::error_with_data(
-                    ValidationMessageWithData::UnknownField {
-                        type_: self.schema.get_type_name(parent_type.inner()),
-                        field: field.name.value,
-                        suggestions: self
-                            .suggestions
-                            .field_name_suggestion(Some(parent_type.inner()), field.name.value),
-                    },
-                    self.location.with_span(span),
-                )]);
+                return Err(vec![
+                    Diagnostic::error_with_data(
+                        ValidationMessageWithData::UnknownField {
+                            type_: self.schema.get_type_name(parent_type.inner()),
+                            field: field.name.value,
+                            suggestions: self
+                                .suggestions
+                                .field_name_suggestion(Some(parent_type.inner()), field.name.value),
+                        },
+                        self.location.with_span(span),
+                    )
+                    .metadata_for_machine(
+                        MachineMetadataKey::UnknownField,
+                        field.name.value.lookup(),
+                    )
+                    .metadata_for_machine(
+                        MachineMetadataKey::ParentType,
+                        self.schema.get_type_name(parent_type.inner()).lookup(),
+                    ),
+                ]);
             }
         };
         let field_definition = self.schema.field(field_id);
@@ -1305,12 +1371,12 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
         // Check for repeated directives that are not @repeatable
         if directives.len() > 1 {
             for (index, directive) in directives.iter().enumerate() {
-                let directive_repeatable = self.schema.get_directive(directive.name.item).map_or(
-                    // Default to `false` instead of expecting a definition
-                    // since @arguments directive is not defined in the schema.
-                    false,
-                    |dir| dir.repeatable,
-                );
+                let directive_repeatable =
+                    self.schema.get_directive(directive.name.item).is_some_and(
+                        // Default to `false` instead of expecting a definition
+                        // since @arguments directive is not defined in the schema.
+                        |dir| dir.repeatable,
+                    );
                 if directive_repeatable {
                     continue;
                 }
@@ -1324,9 +1390,9 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
                             ValidationMessage::RepeatedNonRepeatableDirective {
                                 name: directive.name.item,
                             },
-                            repeated_directive.name.location,
+                            repeated_directive.location,
                         )
-                        .annotate("previously used here", directive.name.location),
+                        .annotate("previously used here", directive.location),
                     ]);
                 }
             }
@@ -1354,6 +1420,7 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
                     .map(DirectiveName),
                 arguments: vec![],
                 data: None,
+                location: self.location.with_span(directive.span),
             });
         }
         let directive_definition = match self
@@ -1370,9 +1437,15 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
         };
         if !directive_definition.locations.contains(&location) {
             return Err(vec![Diagnostic::error(
-                ValidationMessage::InvalidDirectiveUsageUnsupportedLocation(DirectiveName(
-                    directive.name.value,
-                )),
+                ValidationMessage::InvalidDirectiveUsageUnsupportedLocation {
+                    directive_name: DirectiveName(directive.name.value),
+                    valid_locations: directive_definition
+                        .locations
+                        .iter()
+                        .map(|l| l.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                },
                 self.location.with_span(directive.name.span),
             )]);
         }
@@ -1393,6 +1466,7 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
             ),
             arguments,
             data: None,
+            location: self.location.with_span(directive.span),
         })
     }
 
@@ -1626,17 +1700,24 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
                         ),
                     })
                 }
-                None => Err(vec![Diagnostic::error(
-                    ValidationMessageWithData::UnknownField {
-                        type_: type_definition.name.item.0,
-                        field: x.name.value,
-                        suggestions: self.suggestions.field_name_suggestion(
-                            self.schema.get_type(type_definition.name.item.0),
-                            x.name.value,
-                        ),
-                    },
-                    self.location.with_span(x.name.span),
-                )]),
+                None => Err(vec![
+                    Diagnostic::error(
+                        ValidationMessageWithData::UnknownField {
+                            type_: type_definition.name.item.0,
+                            field: x.name.value,
+                            suggestions: self.suggestions.field_name_suggestion(
+                                self.schema.get_type(type_definition.name.item.0),
+                                x.name.value,
+                            ),
+                        },
+                        self.location.with_span(x.name.span),
+                    )
+                    .metadata_for_machine(MachineMetadataKey::UnknownField, x.name.value.lookup())
+                    .metadata_for_machine(
+                        MachineMetadataKey::ParentType,
+                        type_definition.name.item.0.lookup(),
+                    ),
+                ]),
             }
         }))?;
         if required_fields.is_empty() {
@@ -1780,17 +1861,27 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
                         Err(diagnostics) => errors.extend(diagnostics),
                     }
                 }
-                None => errors.push(Diagnostic::error(
-                    ValidationMessageWithData::UnknownField {
-                        type_: type_definition.name.item.0,
-                        field: obj_entry.name.value,
-                        suggestions: self.suggestions.field_name_suggestion(
-                            self.schema.get_type(type_definition.name.item.0),
-                            obj_entry.name.value,
-                        ),
-                    },
-                    self.location.with_span(obj_entry.name.span),
-                )),
+                None => errors.push(
+                    Diagnostic::error(
+                        ValidationMessageWithData::UnknownField {
+                            type_: type_definition.name.item.0,
+                            field: obj_entry.name.value,
+                            suggestions: self.suggestions.field_name_suggestion(
+                                self.schema.get_type(type_definition.name.item.0),
+                                obj_entry.name.value,
+                            ),
+                        },
+                        self.location.with_span(obj_entry.name.span),
+                    )
+                    .metadata_for_machine(
+                        MachineMetadataKey::UnknownField,
+                        obj_entry.name.value.lookup(),
+                    )
+                    .metadata_for_machine(
+                        MachineMetadataKey::ParentType,
+                        type_definition.name.item.0.lookup(),
+                    ),
+                ),
             }
         }
         if !required_fields.is_empty() {
@@ -1959,7 +2050,7 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
                 if !self.options.allow_custom_scalar_literals {
                     return Err(vec![Diagnostic::error(
                         ValidationMessage::UnexpectedCustomScalarLiteral {
-                            literal_value: format!("{}", value),
+                            literal_value: format!("{value}"),
                             scalar_type_name: type_definition.name.item,
                         },
                         self.location.with_span(value.span()),
@@ -2048,10 +2139,16 @@ impl<'schema, 'signatures, 'options> Builder<'schema, 'signatures, 'options> {
         parent_types: &'a [TypeReference<Type>],
         type_condition: Type,
     ) -> Option<&'a TypeReference<Type>> {
+        let allow_non_overlapping_abstract_spreads =
+            self.options.allow_non_overlapping_abstract_spreads
+                && type_condition.is_abstract_type();
         parent_types.iter().find(|parent_type| {
-            !self
-                .schema
-                .are_overlapping_types(parent_type.inner(), type_condition)
+            let is_allowed_abstract_spread =
+                allow_non_overlapping_abstract_spreads && type_condition.is_abstract_type();
+            !is_allowed_abstract_spread
+                && !self
+                    .schema
+                    .are_overlapping_types(parent_type.inner(), type_condition)
         })
     }
 }

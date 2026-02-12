@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<5c4c36caefa9fe6ac325c274d9dbed18>>
+ * @generated SignedSource<<999988a6c8306737a4a984e4a6491875>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -98,7 +98,7 @@ return {
                 "fragment": null,
                 "kind": "RelayResolver",
                 "name": "client_object",
-                "resolverModule": require('./../resolvers/UserClientEdgeClientObjectResolver').client_object,
+                "resolverModule": require('../resolvers/UserClientEdgeClientObjectResolver').client_object,
                 "path": "me.client_object",
                 "normalizationInfo": {
                   "kind": "OutputType",
@@ -109,8 +109,7 @@ return {
               },
               "linkedField": (v1/*: any*/)
             },
-            "action": "THROW",
-            "path": "me.client_object"
+            "action": "THROW"
           }
         ],
         "storageKey": null

@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<04d4254435d6d6e20bf89146b058e903>>
+ * @generated SignedSource<<0df017f62e79dce8d709bee83a912239>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -27,11 +27,11 @@ import type { TestResolverContextType } from "../../../relay-runtime/mutations/_
 (queryManyLiveTodosResolverType: (
   args: void,
   context: TestResolverContextType,
-) => LiveState<?$ReadOnlyArray<?Query__many_live_todos$normalization>>);
+) => LiveState<?ReadonlyArray<?Query__many_live_todos$normalization>>);
 import type { Query__many_live_todos$normalization } from "./../../../relay-runtime/store/__tests__/resolvers/__generated__/Query__many_live_todos$normalization.graphql";
 export type RelayResolversWithOutputTypeTestManyLiveTodosQuery$variables = {||};
 export type RelayResolversWithOutputTypeTestManyLiveTodosQuery$data = {|
-  +many_live_todos: ?$ReadOnlyArray<?{|
+  +many_live_todos: ?ReadonlyArray<?{|
     +$fragmentSpreads: RelayResolversWithOutputTypeTestFragment$fragmentType,
   |}>,
 |};
@@ -89,7 +89,7 @@ return {
           "fragment": null,
           "kind": "RelayLiveResolver",
           "name": "many_live_todos",
-          "resolverModule": require('./../../../relay-runtime/store/__tests__/resolvers/QueryManyLiveTodos').many_live_todos,
+          "resolverModule": require('../../../relay-runtime/store/__tests__/resolvers/QueryManyLiveTodos').many_live_todos,
           "path": "many_live_todos",
           "normalizationInfo": {
             "kind": "OutputType",

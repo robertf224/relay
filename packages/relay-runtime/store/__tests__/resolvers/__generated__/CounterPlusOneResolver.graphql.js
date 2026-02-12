@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<1fb119578070513b8dbd94af420f38ab>>
+ * @generated SignedSource<<20d020948201bd947ae921b85d61f9d2>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -31,7 +31,7 @@ import type { TestResolverContextType } from "../../../../mutations/__tests__/Te
 ) => LiveState<?number>);
 declare export opaque type CounterPlusOneResolver$fragmentType: FragmentType;
 export type CounterPlusOneResolver$data = {|
-  +counter: $NonMaybeType<?number>,
+  +counter: NonNullable<?number>,
   +$fragmentType: CounterPlusOneResolver$fragmentType,
 |};
 export type CounterPlusOneResolver$key = {
@@ -59,11 +59,10 @@ var node/*: ReaderFragment*/ = {
         },
         "kind": "RelayLiveResolver",
         "name": "counter",
-        "resolverModule": require('./../LiveCounterResolver').counter,
+        "resolverModule": require('../LiveCounterResolver').counter,
         "path": "counter"
       },
-      "action": "THROW",
-      "path": "counter"
+      "action": "THROW"
     }
   ],
   "type": "Query",

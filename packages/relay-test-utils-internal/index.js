@@ -28,6 +28,7 @@ const {
   FIXTURE_TAG,
   generateTestsFromFixtures,
 } = require('./generateTestsFromFixtures');
+const injectPromisePolyfill__DEPRECATED = require('./injectPromisePolyfill__DEPRECATED');
 const Matchers = require('./Matchers');
 const printAST = require('./printAST');
 const simpleClone = require('./simpleClone');
@@ -48,6 +49,7 @@ const {createMockEnvironment, unwrapContainer} = require('relay-test-utils');
 function cannotReadPropertyOfUndefined__DEPRECATED(
   propertyName: string,
 ): string {
+  // $FlowFixMe[cannot-resolve-name]
   const matches = process.version.match(/^v(\d+)\./);
   const majorVersion = matches == null ? null : parseInt(matches[1], 10);
   if (majorVersion == null || majorVersion < 16) {
@@ -77,14 +79,15 @@ module.exports = {
   expectConsoleError,
   expectConsoleErrorsMany,
   expectConsoleErrorWillFire,
-  expectConsoleWarningWillFire,
   expectConsoleWarning,
   expectConsoleWarningsMany,
+  expectConsoleWarningWillFire,
   expectToWarn,
   expectToWarnMany,
   expectWarningWillFire,
   FIXTURE_TAG,
   generateTestsFromFixtures,
+  injectPromisePolyfill__DEPRECATED,
   matchers: Matchers,
   printAST,
   simpleClone,

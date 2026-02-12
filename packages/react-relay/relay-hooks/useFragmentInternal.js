@@ -20,12 +20,13 @@ import {RelayFeatureFlags} from 'relay-runtime';
 
 hook useFragmentInternal(
   fragmentNode: ReaderFragment,
-  fragmentRef: mixed,
+  fragmentRef: unknown,
   hookDisplayName: string,
   queryOptions?: FragmentQueryOptions,
 ): ?SelectorData | Array<?SelectorData> {
   if (RelayFeatureFlags.ENABLE_ACTIVITY_COMPATIBILITY) {
     // $FlowFixMe[react-rule-hook] - the condition is static
+    // $FlowFixMe[react-rule-hook-conditional]
     return useFragmentInternal_EXPERIMENTAL(
       fragmentNode,
       fragmentRef,
@@ -34,6 +35,7 @@ hook useFragmentInternal(
     );
   }
   // $FlowFixMe[react-rule-hook] - the condition is static
+  // $FlowFixMe[react-rule-hook-conditional]
   return useFragmentInternal_CURRENT(
     fragmentNode,
     fragmentRef,

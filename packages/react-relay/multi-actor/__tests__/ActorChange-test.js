@@ -33,10 +33,16 @@ const {
   MultiActorEnvironment,
   getActorIdentifier,
 } = require('relay-runtime/multi-actor-environment');
-const {disallowWarnings, skipIf} = require('relay-test-utils-internal');
+const {
+  disallowWarnings,
+  injectPromisePolyfill__DEPRECATED,
+  skipIf,
+} = require('relay-test-utils-internal');
+
+injectPromisePolyfill__DEPRECATED();
 
 function ComponentWrapper(
-  props: $ReadOnly<{
+  props: Readonly<{
     children: React.Node,
     environment: IActorEnvironment,
     multiActorEnvironment: IMultiActorEnvironment,
@@ -124,7 +130,7 @@ function MainComponent() {
   );
 }
 
-type Props = $ReadOnly<{
+type Props = Readonly<{
   myFragment: ActorChangeTestFeedUnitFragment$key,
   actorIdentifier: ActorIdentifier,
 }>;
@@ -163,7 +169,7 @@ describe('ActorChange', () => {
   let environment;
   let multiActorEnvironment;
   let fetchFnForActor: JestMockFn<
-    Array<mixed>,
+    Array<unknown>,
     ObservableFromValue<GraphQLResponse>,
   >;
 
@@ -179,6 +185,7 @@ describe('ActorChange', () => {
     );
   });
 
+  // $FlowFixMe[cannot-resolve-name]
   skipIf(process.env.OSS, 'should render a fragment for actor', () => {
     fetchFnForActor = jest.fn(actorId =>
       Observable.from(
@@ -280,6 +287,7 @@ describe('ActorChange', () => {
   });
 
   skipIf(
+    // $FlowFixMe[cannot-resolve-name]
     process.env.OSS,
     'should send a query and mutations with correct actor id, from the correct environment',
     () => {

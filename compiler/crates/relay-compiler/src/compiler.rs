@@ -5,6 +5,13 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+//! The compiler module compiles Relay source code into efficient and optimized runtime artifacts.
+//!
+//! The main entrypoint function for this module is `compile`. It performs several steps including:
+//! * Parsing GraphQL sources into an abstract syntax tree (AST)
+//! * Validating the AST against the GraphQL specification
+//! * Applying transformations to the AST
+//! * Generating output files based on the transformed AST
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -22,13 +29,15 @@ use tokio::sync::Notify;
 use tokio::task;
 use tokio::task::JoinHandle;
 
+use crate::FileSourceResult;
 use crate::artifact_map::ArtifactSourceKey;
+use crate::build_project::BuildProjectFailure;
 use crate::build_project::build_project;
 use crate::build_project::commit_project;
-use crate::build_project::BuildProjectFailure;
 use crate::compiler_state::ArtifactMapKind;
 use crate::compiler_state::CompilerState;
 use crate::compiler_state::DocblockSources;
+use crate::compiler_state::FullSources;
 use crate::config::Config;
 use crate::errors::Error;
 use crate::errors::Result;
@@ -37,7 +46,6 @@ use crate::file_source::FileSourceSubscriptionNextChange;
 use crate::file_source::LocatedDocblockSource;
 use crate::graphql_asts::GraphQLAsts;
 use crate::red_to_green::RedToGreen;
-use crate::FileSourceResult;
 
 pub struct Compiler<TPerfLogger>
 where
@@ -92,11 +100,57 @@ impl<TPerfLogger: PerfLogger> Compiler<TPerfLogger> {
         }
     }
 
+    /// Exposed for testing.
+    ///
+    /// Perform an incremental build using an existing compiler state.
+    ///
+    /// This method is useful for testing incremental compilation. The caller should:
+    /// 1. Push file source changes to `compiler_state.pending_file_source_changes`
+    /// 2. Call this method to merge changes and rebuild
+    pub async fn build_with_changed_files(&self, compiler_state: &mut CompilerState) -> Result<()> {
+        let setup_event = self.perf_logger.create_event("incremental_build");
+        self.config.status_reporter.build_starts();
+
+        let result: Result<Vec<Diagnostic>> = async {
+            let had_new_changes = compiler_state.merge_file_source_changes(
+                &self.config,
+                self.perf_logger.as_ref(),
+                false,
+            )?;
+
+            if had_new_changes {
+                self.build_projects(compiler_state, &setup_event).await
+            } else {
+                Ok(vec![])
+            }
+        }
+        .await;
+        setup_event.complete();
+
+        match result {
+            Ok(non_fatal_diagnostics) => {
+                self.config
+                    .status_reporter
+                    .build_completes(&non_fatal_diagnostics);
+                Ok(())
+            }
+            Err(error) => {
+                self.config.status_reporter.build_errors(&error);
+                Err(error)
+            }
+        }
+    }
+
     pub async fn watch(&self) -> Result<()> {
         'watch: loop {
             let setup_event = self.perf_logger.create_event("compiler_setup");
             let initial_watch_compile_timer = setup_event.start("initial_watch_compile");
             self.config.status_reporter.build_starts();
+
+            // Signal that the initial build is starting
+            if let Some(build_status) = &self.config.build_status {
+                build_status.changes_pending();
+            }
             let result: Result<(CompilerState, Arc<Notify>, JoinHandle<()>)> = async {
                 if let Some(initialize_resources) = &self.config.initialize_resources {
                     let timer = setup_event.start("load_resources");
@@ -148,8 +202,15 @@ impl<TPerfLogger: PerfLogger> Compiler<TPerfLogger> {
                                     WatchmanFileSourceSubscriptionNextChange::None => {}
                                 }
                             }
+                            Ok(FileSourceSubscriptionNextChange::Test(file_source_changes)) => {
+                                pending_file_source_changes
+                                    .write()
+                                    .unwrap()
+                                    .push(FileSourceResult::WalkDir(file_source_changes));
+                                notify_sender.notify_one();
+                            }
                             Err(err) => {
-                                panic!("Watchman subscription error: {}", err);
+                                panic!("Watchman subscription error: {err}");
                             }
                         }
                     }
@@ -166,10 +227,16 @@ impl<TPerfLogger: PerfLogger> Compiler<TPerfLogger> {
                     match self.build_projects(&mut compiler_state, &setup_event).await {
                         Ok(diagnostics) => {
                             self.config.status_reporter.build_completes(&diagnostics);
+                            if let Some(build_status) = &self.config.build_status {
+                                build_status.build_completed();
+                            }
                         }
                         Err(err) => {
                             red_to_green.log_error();
                             self.config.status_reporter.build_errors(&err);
+                            if let Some(build_status) = &self.config.build_status {
+                                build_status.build_completed();
+                            }
                         }
                     };
                     setup_event.stop(initial_watch_compile_timer);
@@ -185,6 +252,10 @@ impl<TPerfLogger: PerfLogger> Compiler<TPerfLogger> {
                 }
                 Err(err) => {
                     self.config.status_reporter.build_errors(&err);
+                    // Signal that the initial setup failed
+                    if let Some(build_status) = &self.config.build_status {
+                        build_status.build_completed();
+                    }
                     break 'watch Err(err);
                 }
             }
@@ -202,7 +273,16 @@ impl<TPerfLogger: PerfLogger> Compiler<TPerfLogger> {
         loop {
             notify_receiver.notified().await;
 
+            // Signal that changes have been detected and a build may occur
+            if let Some(build_status) = &self.config.build_status {
+                build_status.changes_pending();
+            }
+
             if compiler_state.source_control_update_status.is_started() {
+                // Clear pending changes since we're skipping this notification
+                if let Some(build_status) = &self.config.build_status {
+                    build_status.no_pending_changes();
+                }
                 continue;
             }
 
@@ -229,7 +309,7 @@ impl<TPerfLogger: PerfLogger> Compiler<TPerfLogger> {
                     Ok(b) => b,
                     Err(err) => {
                         let error_event = self.perf_logger.create_event("watch_build_error");
-                        error_event.string("error", format!("Ignored Compilation Error: {}", err));
+                        error_event.string("error", format!("Ignored Compilation Error: {err}"));
                         error_event.complete();
                         return;
                     }
@@ -245,11 +325,17 @@ impl<TPerfLogger: PerfLogger> Compiler<TPerfLogger> {
                     {
                         Ok(diagnostics) => {
                             self.config.status_reporter.build_completes(&diagnostics);
+                            if let Some(build_status) = &self.config.build_status {
+                                build_status.build_completed();
+                            }
                             red_to_green.clear_error_and_log(self.perf_logger.as_ref());
                         }
                         Err(err) => {
                             red_to_green.log_error();
                             self.config.status_reporter.build_errors(&err);
+                            if let Some(build_status) = &self.config.build_status {
+                                build_status.build_completed();
+                            }
                         }
                     }
 
@@ -257,6 +343,10 @@ impl<TPerfLogger: PerfLogger> Compiler<TPerfLogger> {
                     info!("Watching for new changes...");
                 } else {
                     debug!("No new changes detected.");
+                    // Clear the pending changes flag since there were no actual changes
+                    if let Some(build_status) = &self.config.build_status {
+                        build_status.no_pending_changes();
+                    }
                     incremental_build_event.stop(incremental_build_time);
                 }
                 incremental_build_event.complete();
@@ -316,10 +406,10 @@ async fn build_projects<TPerfLogger: PerfLogger + 'static>(
     let build_results: Vec<_> = config
         .par_enabled_projects()
         .filter(|project_config| {
-            if let Some(base) = project_config.base {
-                if compiler_state.project_has_pending_changes(base) {
-                    return true;
-                }
+            if let Some(base) = project_config.base
+                && compiler_state.project_has_pending_changes(base)
+            {
+                return true;
             }
             compiler_state.project_has_pending_changes(project_config.name)
         })
@@ -366,6 +456,7 @@ async fn build_projects<TPerfLogger: PerfLogger + 'static>(
         let perf_logger = Arc::clone(&perf_logger);
         let artifact_map = compiler_state
             .artifacts
+            .0
             .get(&project_name)
             .cloned()
             .unwrap_or_else(|| Arc::new(ArtifactMapKind::Unconnected(Default::default())));
@@ -378,6 +469,9 @@ async fn build_projects<TPerfLogger: PerfLogger + 'static>(
             get_removed_docblock_artifact_source_keys(compiler_state.docblocks.get(&project_name));
 
         removed_artifact_sources.extend(removed_docblock_artifact_sources);
+        removed_artifact_sources.extend(get_removed_full_sources(
+            compiler_state.full_sources.get(&project_name),
+        ));
 
         let dirty_artifact_paths = compiler_state
             .dirty_artifact_paths
@@ -423,6 +517,7 @@ async fn build_projects<TPerfLogger: PerfLogger + 'static>(
                 let next_artifact_map = Arc::new(ArtifactMapKind::Mapping(next_artifact_map));
                 compiler_state
                     .artifacts
+                    .0
                     .insert(project_name, next_artifact_map);
                 compiler_state.schema_cache.insert(project_name, schema);
 
@@ -480,9 +575,28 @@ fn get_removed_docblock_artifact_source_keys(
                 }
             }
         }
-
-        removed_docblocks
-    } else {
-        vec![]
     }
+
+    removed_docblocks
+}
+
+/// Get the list of removed full sources.
+fn get_removed_full_sources(full_sources: Option<&FullSources>) -> Vec<ArtifactSourceKey> {
+    let mut removed_full_sources: Vec<ArtifactSourceKey> = vec![];
+    if let Some(full_sources) = full_sources {
+        for (file, pending_source_text) in full_sources.pending.iter() {
+            if let Some(processed_source_text) = full_sources.processed.get(file) {
+                // Full sources are keyed by a hash of their contents.
+                // Therefore if the contents of a file have changed we must
+                // treat the hash of the old version of that file as removed.
+                if pending_source_text != processed_source_text {
+                    // For now, full sources are only used for ResolverHash
+                    removed_full_sources.push(ArtifactSourceKey::ResolverHash(
+                        ResolverSourceHash::new(processed_source_text),
+                    ))
+                }
+            }
+        }
+    }
+    removed_full_sources
 }

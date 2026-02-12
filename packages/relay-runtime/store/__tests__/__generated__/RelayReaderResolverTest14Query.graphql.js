@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<b12265d82d587cd61399598b45eb10ff>>
+ * @generated SignedSource<<c1590940e8c32b5d60b14c9d5d8c5737>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -27,7 +27,7 @@ import type { TestResolverContextType } from "../../../mutations/__tests__/TestR
   rootKey: ThrowBeforeReadResolver$key,
   args: void,
   context: TestResolverContextType,
-) => ?mixed);
+) => ?unknown);
 export type RelayReaderResolverTest14Query$variables = {||};
 export type RelayReaderResolverTest14Query$data = {|
   +throw_before_read: ?ReturnType<typeof queryThrowBeforeReadResolverType>,
@@ -55,7 +55,7 @@ var node/*: ConcreteRequest*/ = {
         },
         "kind": "RelayResolver",
         "name": "throw_before_read",
-        "resolverModule": require('./../resolvers/ThrowBeforeReadResolver').throw_before_read,
+        "resolverModule": require('../resolvers/ThrowBeforeReadResolver').throw_before_read,
         "path": "throw_before_read"
       }
     ],

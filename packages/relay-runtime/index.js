@@ -35,11 +35,12 @@ const {
 } = require('./store/ClientID');
 const createFragmentSpecResolver = require('./store/createFragmentSpecResolver');
 const createRelayContext = require('./store/createRelayContext');
+const createRelayLoggingContext = require('./store/createRelayLoggingContext');
+const isRelayModernEnvironment = require('./store/isRelayModernEnvironment');
 const {
   isSuspenseSentinel,
   suspenseSentinel,
-} = require('./store/experimental-live-resolvers/LiveResolverSuspenseSentinel');
-const isRelayModernEnvironment = require('./store/isRelayModernEnvironment');
+} = require('./store/live-resolvers/LiveResolverSuspenseSentinel');
 const normalizeResponse = require('./store/normalizeResponse');
 const readInlineData = require('./store/readInlineData');
 const RelayConcreteVariables = require('./store/RelayConcreteVariables');
@@ -64,7 +65,9 @@ const getRefetchMetadata = require('./util/getRefetchMetadata');
 const getRelayHandleKey = require('./util/getRelayHandleKey');
 const getRequestIdentifier = require('./util/getRequestIdentifier');
 const getValueAtPath = require('./util/getValueAtPath');
-const handlePotentialSnapshotErrors = require('./util/handlePotentialSnapshotErrors');
+const {
+  handlePotentialSnapshotErrors,
+} = require('./util/handlePotentialSnapshotErrors');
 const isPromise = require('./util/isPromise');
 const isScalarAndEqual = require('./util/isScalarAndEqual');
 const recycleNodesInto = require('./util/recycleNodesInto');
@@ -134,7 +137,6 @@ export type {
   LogEvent,
   LogFunction,
   MissingFieldHandler,
-  MissingRequiredFields,
   ModuleImportPointer,
   MutableRecordSource,
   MutationParameters,
@@ -231,6 +233,7 @@ export type {
   ClientQuery,
   RefetchableFragment,
   RenderPolicy,
+  PrefetchableRefetchableFragment,
   UpdatableFragment,
   UpdatableQuery,
   Variables,
@@ -314,6 +317,7 @@ module.exports = {
   suspenseSentinel,
   isRequest: GraphQLTag.isRequest,
   readInlineData,
+  readFragment: ResolverFragments.readFragment,
 
   // Declarative mutation API
   MutationTypes: RelayDeclarativeMutationConfig.MutationTypes,
@@ -377,6 +381,7 @@ module.exports = {
     ResolverFragments,
     OperationTracker: RelayOperationTracker,
     createRelayContext: createRelayContext,
+    createRelayLoggingContext: createRelayLoggingContext,
     getOperationVariables: RelayConcreteVariables.getOperationVariables,
     getLocalVariables: RelayConcreteVariables.getLocalVariables,
     fetchQuery: fetchQueryInternal.fetchQuery,

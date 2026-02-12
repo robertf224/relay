@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<3e860cb5d5fa93b21b772ca4c14cfd43>>
+ * @generated SignedSource<<9dcb393db8a3a7adfa8202c9ed3e6614>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -36,7 +36,7 @@ export type RelayReaderRequiredFieldsTest29Query$data = {|
     +client_object: {|
       +description: ?string,
     |},
-  |}, $ReadOnlyArray<mixed>>,
+  |}, unknown>,
 |};
 export type RelayReaderRequiredFieldsTest29Query = {|
   response: RelayReaderRequiredFieldsTest29Query$data,
@@ -102,7 +102,7 @@ return {
                   "fragment": null,
                   "kind": "RelayResolver",
                   "name": "client_object",
-                  "resolverModule": require('./../resolvers/UserClientEdgeClientObjectResolver').client_object,
+                  "resolverModule": require('../resolvers/UserClientEdgeClientObjectResolver').client_object,
                   "path": "me.client_object",
                   "normalizationInfo": {
                     "kind": "OutputType",
@@ -113,14 +113,12 @@ return {
                 },
                 "linkedField": (v1/*: any*/)
               },
-              "action": "THROW",
-              "path": "me.client_object"
+              "action": "THROW"
             }
           ],
           "storageKey": null
         },
-        "to": "RESULT",
-        "path": "me"
+        "to": "RESULT"
       }
     ],
     "type": "Query",

@@ -17,18 +17,25 @@ import type {IEnvironment} from 'relay-runtime/store/RelayStoreTypes';
 const useEntryPointLoader = require('../useEntryPointLoader');
 const React = require('react');
 const ReactTestRenderer = require('react-test-renderer');
-const {createMockEnvironment} = require('relay-test-utils-internal');
+const {
+  createMockEnvironment,
+  injectPromisePolyfill__DEPRECATED,
+} = require('relay-test-utils-internal');
+
+injectPromisePolyfill__DEPRECATED();
 
 let loadedEntryPoint;
 let instance;
 let entryPointLoaderCallback: (params: {...}) => void;
-let dispose: ?JestMockFn<$ReadOnlyArray<mixed>, mixed>;
+let dispose: ?JestMockFn<ReadonlyArray<unknown>, unknown>;
 let loadEntryPointLastReturnValue;
 let disposeEntryPoint;
 
 let renderCount: ?number;
-let environment;
-let defaultEnvironmentProvider;
+let environment: IEnvironment;
+let defaultEnvironmentProvider: Readonly<{
+  getEnvironment: (options: ?EnvironmentProviderOptions) => IEnvironment,
+}>;
 let render;
 let Container;
 let defaultEntryPoint: any;
@@ -36,7 +43,7 @@ let defaultEntryPoint: any;
 const loadEntryPoint = jest
   /* $FlowFixMe[underconstrained-implicit-instantiation] error found when
    * enabling Flow LTI mode */
-  .fn<_, {dispose: JestMockFn<$ReadOnlyArray<mixed>, mixed>}>()
+  .fn<_, {dispose: JestMockFn<ReadonlyArray<unknown>, unknown>}>()
   .mockImplementation(() => {
     dispose = jest.fn();
     return (loadEntryPointLastReturnValue = {
@@ -70,12 +77,12 @@ beforeEach(() => {
   Container = function ({
     entryPoint,
     environmentProvider,
-  }: {
+  }: Readonly<{
     entryPoint: any,
-    environmentProvider: {
+    environmentProvider: Readonly<{
       getEnvironment: (options: ?EnvironmentProviderOptions) => IEnvironment,
-    },
-  }) {
+    }>,
+  }>) {
     renderCount = (renderCount || 0) + 1;
     [loadedEntryPoint, entryPointLoaderCallback, disposeEntryPoint] =
       // $FlowFixMe[react-rule-hook]
@@ -144,6 +151,8 @@ it('disposes the entry point and nullifies the state when the disposeEntryPoint 
   const params = {};
   ReactTestRenderer.act(() => entryPointLoaderCallback(params));
   expect(disposeEntryPoint).toBeDefined();
+  /* $FlowFixMe[constant-condition] Error discovered during Constant Condition
+   * roll out. See https://fburl.com/workplace/1v97vimq. */
   if (disposeEntryPoint) {
     expect(loadedEntryPoint).not.toBe(null);
     expect(dispose).not.toHaveBeenCalled();
@@ -186,8 +195,8 @@ it('does not dispose the entry point before the new component tree unsuspends in
         {},
         {...},
         {...},
-        mixed,
-        EntryPointComponent<{}, {...}, {...}, mixed>,
+        unknown,
+        EntryPointComponent<{}, {...}, {...}, unknown>,
         _,
       >(defaultEnvironmentProvider, defaultEntryPoint);
       return null;
@@ -197,7 +206,7 @@ it('does not dispose the entry point before the new component tree unsuspends in
       ReactTestRenderer.act(() => {
         instance = ReactTestRenderer.create(
           <ConcurrentWrapper />,
-          // $FlowFixMe[prop-missing] - error revealed when flow-typing ReactTestRenderer
+          // $FlowFixMe[incompatible-type] - error revealed when flow-typing ReactTestRenderer
           {unstable_isConcurrent: true},
         );
       });
@@ -205,7 +214,7 @@ it('does not dispose the entry point before the new component tree unsuspends in
 
     let transitionToSecondRoute;
     function ConcurrentWrapper() {
-      const [route, setRoute] = React.useState('FIRST');
+      const [route, setRoute] = React.useState<'FIRST' | 'SECOND'>('FIRST');
 
       transitionToSecondRoute = () =>
         React.startTransition(() => setRoute('SECOND'));
@@ -236,6 +245,8 @@ it('does not dispose the entry point before the new component tree unsuspends in
     expect(currentDispose).not.toHaveBeenCalled();
 
     ReactTestRenderer.act(() => {
+      /* $FlowFixMe[constant-condition] Error discovered during Constant
+       * Condition roll out. See https://fburl.com/workplace/1v97vimq. */
       resolve && resolve();
       jest.runAllImmediates();
     });
@@ -266,7 +277,7 @@ it('disposes entry point references associated with previous suspensions when mu
       ReactTestRenderer.act(() => {
         instance = ReactTestRenderer.create(
           <ConcurrentWrapper />,
-          // $FlowFixMe[prop-missing] - error revealed when flow-typing ReactTestRenderer
+          // $FlowFixMe[incompatible-type] - error revealed when flow-typing ReactTestRenderer
           {unstable_isConcurrent: true},
         );
       });
@@ -295,8 +306,8 @@ it('disposes entry point references associated with previous suspensions when mu
         {},
         {...},
         {...},
-        mixed,
-        EntryPointComponent<{}, {...}, {...}, mixed>,
+        unknown,
+        EntryPointComponent<{}, {...}, {...}, unknown>,
         _,
       >(defaultEnvironmentProvider, defaultEntryPoint);
       if (
@@ -369,7 +380,7 @@ it('disposes entry point references associated with subsequent suspensions when 
       ReactTestRenderer.act(() => {
         instance = ReactTestRenderer.create(
           <ConcurrentWrapper />,
-          // $FlowFixMe[prop-missing] - error revealed when flow-typing ReactTestRenderer
+          // $FlowFixMe[incompatible-type] - error revealed when flow-typing ReactTestRenderer
           {unstable_isConcurrent: true},
         );
       });
@@ -399,8 +410,8 @@ it('disposes entry point references associated with subsequent suspensions when 
         {},
         {...},
         {...},
-        mixed,
-        EntryPointComponent<{}, {...}, {...}, mixed>,
+        unknown,
+        EntryPointComponent<{}, {...}, {...}, unknown>,
         _,
       >(defaultEnvironmentProvider, defaultEntryPoint);
       if (
@@ -553,6 +564,7 @@ it('disposes all entry points if the callback is called, the component suspends,
     entryPointLoaderCallback({});
   });
   const secondDispose = dispose;
+  // $FlowFixMe[incompatible-use]
   expect(outerInstance.toJSON()).toEqual('fallback');
 
   // TODO(T19754110): This fails in OSS where we have concurrent mode, but might
@@ -604,6 +616,7 @@ it('disposes all entry points if the component suspends, another entry point is 
   // *even though the component is in a suspended state.* As such, it commits and
   // the entry point is disposed.
   expect(renderCount).toBeLessThanOrEqual(2);
+  // $FlowFixMe[incompatible-use]
   expect(outerInstance.toJSON()).toEqual('fallback');
   expect(dispose).not.toHaveBeenCalled();
   ReactTestRenderer.act(() => outerInstance.unmount());

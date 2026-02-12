@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<eb5e7f7d004e909300da2ffab06cf339>>
+ * @generated SignedSource<<cf6b42db441d5f3508cc81fb0a3786e4>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -22,7 +22,7 @@ import type { Result } from "relay-runtime";
 export type RelayReaderCatchFieldsTest01Query$variables = {||};
 export type RelayReaderCatchFieldsTest01Query$data = {|
   +me: ?{|
-    +lastName: Result<?string, $ReadOnlyArray<mixed>>,
+    +lastName: Result<?string, unknown>,
   |},
 |};
 export type RelayReaderCatchFieldsTest01Query = {|
@@ -57,8 +57,7 @@ return {
           {
             "kind": "CatchField",
             "field": (v0/*: any*/),
-            "to": "RESULT",
-            "path": "me.lastName"
+            "to": "RESULT"
           }
         ],
         "storageKey": null

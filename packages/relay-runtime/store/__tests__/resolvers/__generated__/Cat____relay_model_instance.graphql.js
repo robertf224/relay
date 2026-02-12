@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<f6068017885551bde32980fef7fa3f87>>
+ * @generated SignedSource<<7507fc6eafa586cea26267bc25667d34>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -28,10 +28,10 @@ import type { TestResolverContextType } from "../../../../mutations/__tests__/Te
   id: Cat__id$data['id'],
   args: void,
   context: TestResolverContextType,
-) => mixed);
+) => unknown);
 declare export opaque type Cat____relay_model_instance$fragmentType: FragmentType;
 export type Cat____relay_model_instance$data = {|
-  +__relay_model_instance: $NonMaybeType<ReturnType<typeof catRelayModelInstanceResolverType>>,
+  +__relay_model_instance: NonNullable<ReturnType<typeof catRelayModelInstanceResolverType>>,
   +$fragmentType: Cat____relay_model_instance$fragmentType,
 |};
 export type Cat____relay_model_instance$key = {
@@ -57,7 +57,7 @@ var node/*: ReaderFragment*/ = {
       },
       "kind": "RelayResolver",
       "name": "__relay_model_instance",
-      "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./Cat__id.graphql'), require('./../CatResolvers').Cat, 'id', true),
+      "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./Cat__id.graphql'), require('../CatResolvers').Cat, 'id', true),
       "path": "__relay_model_instance"
     }
   ],

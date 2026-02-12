@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<3f370f33db9526932b4ca632fef5cf2b>>
+ * @generated SignedSource<<c8c2ece040e8c9091c98e87eed62afa6>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -26,7 +26,7 @@ import type { TestResolverContextType } from "../../../relay-runtime/mutations/_
 (queryMutableEntityResolverType: (
   args: void,
   context: TestResolverContextType,
-) => LiveState<?mixed>);
+) => LiveState<?unknown>);
 export type RelayResolverModelTestGetMutableEntityQuery$variables = {||};
 export type RelayResolverModelTestGetMutableEntityQuery$data = {|
   +mutable_entity: ?ReturnType<ReturnType<typeof queryMutableEntityResolverType>["read"]>,
@@ -53,7 +53,7 @@ var node/*: ClientRequest*/ = {
             "fragment": null,
             "kind": "RelayLiveResolver",
             "name": "mutable_entity",
-            "resolverModule": require('./../../../relay-runtime/store/__tests__/resolvers/MutableModel').mutable_entity,
+            "resolverModule": require('../../../relay-runtime/store/__tests__/resolvers/MutableModel').mutable_entity,
             "path": "mutable_entity"
           }
         ]

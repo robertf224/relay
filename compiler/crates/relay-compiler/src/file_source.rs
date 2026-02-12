@@ -5,6 +5,11 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+//! This module provides functionality for working with file sources in the Relay compiler.
+//!
+//! A file source represents a source code file that contains GraphQL code, such as files with `.graphql` or `.js` extensions (the
+//! extension can be set in the relay compiler config). The `FileSource` struct represents a connection to a file source,
+//! and provides methods for reading and parsing the contents of the file.
 mod external_file_source;
 mod extract_graphql;
 mod file_categorizer;
@@ -22,8 +27,8 @@ use std::sync::Arc;
 use common::PerfLogEvent;
 use common::PerfLogger;
 use external_file_source::ExternalFileSource;
-pub use file_categorizer::categorize_files;
 pub use file_categorizer::FileCategorizer;
+pub use file_categorizer::categorize_files;
 pub use file_group::FileGroup;
 use graphql_watchman::WatchmanFileSourceResult;
 use graphql_watchman::WatchmanFileSourceSubscription;
@@ -33,19 +38,20 @@ pub use read_file_to_string::read_file_to_string;
 use serde::Deserialize;
 use serde_bser::value::Value;
 pub use source_control_update_status::SourceControlUpdateStatus;
+use tokio::sync::Notify;
 pub use watchman_client::prelude::Clock;
 use watchman_file_source::WatchmanFileSource;
 
 pub use self::external_file_source::ExternalFileSourceResult;
-pub use self::extract_graphql::extract_javascript_features_from_file;
-pub use self::extract_graphql::source_for_location;
 pub use self::extract_graphql::FsSourceReader;
 pub use self::extract_graphql::LocatedDocblockSource;
 pub use self::extract_graphql::LocatedGraphQLSource;
 pub use self::extract_graphql::LocatedJavascriptSourceFeatures;
 pub use self::extract_graphql::SourceReader;
+pub use self::extract_graphql::extract_javascript_features_from_file;
+pub use self::extract_graphql::source_for_location;
 use self::walk_dir_file_source::WalkDirFileSource;
-use self::walk_dir_file_source::WalkDirFileSourceResult;
+pub use self::walk_dir_file_source::WalkDirFileSourceResult;
 use crate::compiler_state::CompilerState;
 use crate::config::Config;
 use crate::config::FileSourceKind;
@@ -56,6 +62,16 @@ pub enum FileSource {
     Watchman(WatchmanFileSource),
     External(ExternalFileSource),
     WalkDir(WalkDirFileSource),
+    Test(TestFileSource),
+}
+
+/// Test file source for testing the daemon (watch mode) without Watchman.
+///
+/// This file source uses WalkDir for initial query and channel-based
+/// notifications for subscriptions, allowing tests control notification of file changes.
+pub struct TestFileSource {
+    config: Arc<Config>,
+    walk_dir_source: WalkDirFileSource,
 }
 
 impl FileSource {
@@ -73,6 +89,10 @@ impl FileSource {
             FileSourceKind::WalkDir => {
                 Ok(Self::WalkDir(WalkDirFileSource::new(Arc::clone(config))))
             }
+            FileSourceKind::Test(_) => Ok(Self::Test(TestFileSource {
+                config: Arc::clone(config),
+                walk_dir_source: WalkDirFileSource::new(Arc::clone(config)),
+            })),
         }
     }
 
@@ -88,11 +108,10 @@ impl FileSource {
                 if let Err(err) = &result {
                     perf_logger_event.string(
                         "external_file_source_create_compiler_state_error",
-                        format!("{:?}", err),
+                        format!("{err:?}"),
                     );
                     warn!(
-                        "Unable to create state from external source: {:?}. Sending a full watchman query...",
-                        err
+                        "Unable to create state from external source: {err:?}. Sending a full watchman query..."
                     );
                     let watchman_file_source =
                         WatchmanFileSource::connect(&file_source.config, perf_logger_event).await?;
@@ -104,6 +123,9 @@ impl FileSource {
                 }
             }
             Self::WalkDir(file_source) => file_source.create_compiler_state(perf_logger),
+            Self::Test(file_source) => file_source
+                .walk_dir_source
+                .create_compiler_state(perf_logger),
         }
     }
 
@@ -120,6 +142,26 @@ impl FileSource {
                 Ok((
                     compiler_state,
                     FileSourceSubscription::Watchman(watchman_subscription),
+                ))
+            }
+            Self::Test(file_source) => {
+                // Use WalkDir for initial state
+                let compiler_state = file_source
+                    .walk_dir_source
+                    .create_compiler_state(perf_logger)?;
+
+                let notify = match &file_source.config.file_source_config {
+                    FileSourceKind::Test(config) => Arc::clone(&config.notify),
+                    _ => unreachable!("TestFileSource must have FileSourceKind::Test config"),
+                };
+                let walk_dir_source = WalkDirFileSource::new(Arc::clone(&file_source.config));
+
+                Ok((
+                    compiler_state,
+                    FileSourceSubscription::Test(TestFileSourceSubscription {
+                        notify,
+                        walk_dir_source,
+                    }),
                 ))
             }
             Self::External(_) | Self::WalkDir(_) => {
@@ -187,7 +229,19 @@ impl FileSourceResult {
 }
 
 pub enum FileSourceSubscription {
-    Watchman(WatchmanFileSourceSubscription), // Oss(OssFileSourceSubscription)
+    Watchman(WatchmanFileSourceSubscription), // Oss(OssFileSourceSubscription),
+    Test(TestFileSourceSubscription),
+}
+
+/// Test file source subscription for watch mode testing.
+///
+/// This subscription waits on a Notify signal from tests, then does a
+/// WalkDir rescan to find what files changed. This allows tests to:
+/// 1. Write file changes to disk
+/// 2. Call `TestFileSourceConfig::notify()` to trigger a rescan and rebuild
+pub struct TestFileSourceSubscription {
+    notify: Arc<Notify>,
+    walk_dir_source: WalkDirFileSource,
 }
 
 impl FileSourceSubscription {
@@ -199,6 +253,12 @@ impl FileSourceSubscription {
                     |next_change| Ok(FileSourceSubscriptionNextChange::Watchman(next_change)),
                 )
             }
+            Self::Test(test_subscription) => {
+                test_subscription.notify.notified().await;
+                // Do a WalkDir rescan to find what files changed
+                let result = test_subscription.walk_dir_source.query_files()?;
+                Ok(FileSourceSubscriptionNextChange::Test(result))
+            }
         }
     }
 }
@@ -206,4 +266,6 @@ impl FileSourceSubscription {
 #[derive(Debug)]
 pub enum FileSourceSubscriptionNextChange {
     Watchman(WatchmanFileSourceSubscriptionNextChange),
+    /// Test file source notification with rescanned files
+    Test(WalkDirFileSourceResult),
 }

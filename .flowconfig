@@ -6,12 +6,8 @@
 <PROJECT_ROOT>/.*/__tests__/.*/package.json
 
 [options]
+component_syntax=true
 module.system=haste
-module.system.haste.use_name_reducers=true
-# get basename
-module.system.haste.name_reducers='^.*/\([a-zA-Z0-9$_.-]+\.js\(\.flow\)?\)$' -> '\1'
-# strip .js or .js.flow suffix
-module.system.haste.name_reducers='^\(.*\)\.js\(\.flow\)?$' -> '\1'
 
 module.system.haste.paths.excludes=.*/__tests__/.*
 module.system.haste.paths.excludes=.*/__mocks__/.*
@@ -20,17 +16,10 @@ module.system.haste.paths.includes=<PROJECT_ROOT>/node_modules/fbjs/lib/.*
 munge_underscores=true
 ; https://fburl.com/code/h2jnts20 - to match internval value
 
-suppress_type=$FlowIssue
-suppress_type=$FlowFixMe
-suppress_type=$FlowFixMeProps
-suppress_type=$FlowFixMeState
-suppress_type=$FlowExpectedError
-
 format.bracket_spacing=false
 
 [lints]
 untyped-type-import=error
-deprecated-type-predicate=off
 
 [strict]
 deprecated-type
@@ -42,4 +31,4 @@ untyped-import
 untyped-type-import
 
 [version]
-^0.246.0
+^0.300.0

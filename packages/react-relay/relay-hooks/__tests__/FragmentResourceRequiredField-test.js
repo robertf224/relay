@@ -56,6 +56,7 @@ beforeEach(() => {
         node(id: $id) {
           __typename
           ...FragmentResourceRequiredFieldTestUserFragment
+            @dangerously_unaliased_fixme
         }
       }
     `,
@@ -176,6 +177,7 @@ test('Throws if a @required(action: THROW) field is present and then goes missin
     fieldPath: 'name',
     kind: 'missing_required_field.throw',
     owner: 'FragmentResourceRequiredFieldTestUserFragment',
+    handled: false,
   });
 
   disposable.dispose();

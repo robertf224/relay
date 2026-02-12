@@ -47,7 +47,7 @@ pub enum SchemaGenerationError {
     )]
     UseNamedOrDefaultImport,
     #[error(
-        "Failed to find type definition for `{entity_name}` using a {export_type} import from module `{module_name}`. Please make sure `{entity_name}` is imported using a named or default import and that it is a resolver type"
+        "Failed to find @RelayResolver type definition for `{entity_name}` using a {export_type} import from module `{module_name}`. Please make sure `{entity_name}` is either defined locally or imported using a named or default import and that it is a resolver type"
     )]
     ModuleNotFound {
         entity_name: StringKey,
@@ -98,4 +98,12 @@ pub enum SchemaGenerationError {
         module_name: StringKey,
         import_type: JSImportType,
     },
+    #[error(
+        "The key of a property lookup resolver defined with @gqlField must be an identifier (not a string or computed value)."
+    )]
+    ExpectedPropertyLookupToBeIdentifer,
+    #[error(
+        "This field is a property lookup but has an import for a GraphQL fragment used in the resolver. This is not allowed."
+    )]
+    ExpectedResolverFunctionWithRootFragment,
 }

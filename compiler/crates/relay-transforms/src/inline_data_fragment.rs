@@ -13,7 +13,6 @@ use common::DirectiveName;
 use common::Location;
 use common::NamedItem;
 use common::WithLocation;
-use graphql_ir::associated_data_impl;
 use graphql_ir::Argument;
 use graphql_ir::Directive;
 use graphql_ir::FragmentDefinitionName;
@@ -24,11 +23,13 @@ use graphql_ir::Selection;
 use graphql_ir::Transformed;
 use graphql_ir::Transformer;
 use graphql_ir::VariableDefinition;
+use graphql_ir::associated_data_impl;
 use intern::string_key::Intern;
 use lazy_static::lazy_static;
 use thiserror::Error;
 
 use crate::fragment_alias_directive::FRAGMENT_ALIAS_DIRECTIVE_NAME;
+use crate::fragment_alias_directive::FRAGMENT_DANGEROUSLY_UNALIAS_DIRECTIVE_NAME;
 
 lazy_static! {
     pub static ref INLINE_DIRECTIVE_NAME: DirectiveName = DirectiveName("inline".intern());
@@ -67,21 +68,20 @@ impl<'s> InlineDataFragmentsTransform<'s> {
         inline_directive: &Directive,
         spread: &FragmentSpread,
     ) {
-        if let Some(not_allowed_directive) = spread
-            .directives
-            .iter()
-            .find(|directive| directive.name.item != *FRAGMENT_ALIAS_DIRECTIVE_NAME)
-        {
+        if let Some(not_allowed_directive) = spread.directives.iter().find(|directive| {
+            directive.name.item != *FRAGMENT_ALIAS_DIRECTIVE_NAME
+                && directive.name.item != *FRAGMENT_DANGEROUSLY_UNALIAS_DIRECTIVE_NAME
+        }) {
             self.errors.push(
                 Diagnostic::error(
                     ValidationMessage::InlineDataFragmentDirectivesNotSupported {
                         directive_name: not_allowed_directive.name.item,
                     },
-                    not_allowed_directive.name.location,
+                    not_allowed_directive.location,
                 )
                 .annotate(
                     "spread is marked as `@inline` here",
-                    inline_directive.name.location,
+                    inline_directive.location,
                 ),
             );
         }
@@ -97,7 +97,7 @@ pub struct InlineDirectiveMetadata {
 }
 associated_data_impl!(InlineDirectiveMetadata);
 
-impl<'s> Transformer for InlineDataFragmentsTransform<'s> {
+impl Transformer<'_> for InlineDataFragmentsTransform<'_> {
     const NAME: &'static str = "InlineDataFragmentsTransform";
     const VISIT_ARGUMENTS: bool = false;
     const VISIT_DIRECTIVES: bool = false;

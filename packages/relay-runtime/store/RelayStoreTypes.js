@@ -75,7 +75,7 @@ export type FragmentMap = {[key: string]: ReaderFragment, ...};
 /**
  * The results of a selector given a store/RecordSource.
  */
-export type SelectorData = {[key: string]: mixed, ...};
+export type SelectorData = {[key: string]: unknown, ...};
 
 export type SingularReaderSelector = {
   +kind: 'SingularReaderSelector',
@@ -91,7 +91,7 @@ export type ReaderSelector = SingularReaderSelector | PluralReaderSelector;
 
 export type PluralReaderSelector = {
   +kind: 'PluralReaderSelector',
-  +selectors: $ReadOnlyArray<SingularReaderSelector>,
+  +selectors: ReadonlyArray<SingularReaderSelector>,
 };
 
 export type FieldErrorType =
@@ -116,21 +116,15 @@ export type NormalizationSelector = {
   +variables: Variables,
 };
 
-type FieldLocation = {
-  path: string,
-  owner: string,
-};
-
-export type MissingRequiredFields = $ReadOnly<
-  | {action: 'THROW', field: FieldLocation}
-  | {action: 'LOG', fields: Array<FieldLocation>},
->;
-
-export type ErrorResponseFields = Array<
+export type FieldError =
   | RelayFieldPayloadErrorEvent
   | MissingExpectedDataLogEvent
-  | MissingExpectedDataThrowEvent,
->;
+  | MissingExpectedDataThrowEvent
+  | RelayResolverErrorEvent
+  | MissingRequiredFieldLogEvent
+  | MissingRequiredFieldThrowEvent;
+
+export type FieldErrors = Array<FieldError>;
 
 export type ClientEdgeTraversalInfo = {
   +readerClientEdge: ReaderClientEdgeToServerObject,
@@ -138,18 +132,11 @@ export type ClientEdgeTraversalInfo = {
 };
 
 export type ClientEdgeTraversalPath =
-  $ReadOnlyArray<ClientEdgeTraversalInfo | null>;
+  ReadonlyArray<ClientEdgeTraversalInfo | null>;
 
 export type MissingClientEdgeRequestInfo = {
   +request: ConcreteRequest,
   +clientEdgeDestinationID: DataID,
-};
-
-export type RelayResolverErrors = Array<RelayResolverErrorEvent>;
-
-export type MissingLiveResolverField = {
-  +path: string,
-  +liveStateID: DataID,
 };
 
 /**
@@ -158,13 +145,11 @@ export type MissingLiveResolverField = {
 export type Snapshot = {
   +data: ?SelectorData,
   +isMissingData: boolean,
-  +missingLiveResolverFields?: $ReadOnlyArray<MissingLiveResolverField>,
-  +missingClientEdges: null | $ReadOnlyArray<MissingClientEdgeRequestInfo>,
+  +missingLiveResolverFields?: ReadonlyArray<DataID>,
+  +missingClientEdges: null | ReadonlyArray<MissingClientEdgeRequestInfo>,
   +seenRecords: DataIDSet,
   +selector: SingularReaderSelector,
-  +missingRequiredFields: ?MissingRequiredFields,
-  +relayResolverErrors: RelayResolverErrors,
-  +errorResponseFields: ?ErrorResponseFields,
+  +fieldErrors: ?FieldErrors,
 };
 
 /**
@@ -185,7 +170,7 @@ export type OperationDescriptor = {
 /**
  * Arbitrary data e.g. received by a container as props.
  */
-export type Props = {[key: string]: mixed, ...};
+export type Props = {[key: string]: unknown, ...};
 
 /**
  * The type of the `relay` property set on React context by the React/Relay
@@ -202,7 +187,7 @@ export type RelayContext = {
  * The results of reading the results of a FragmentMap given some input
  * `Props`.
  */
-export type FragmentSpecResults = {[key: string]: mixed, ...};
+export type FragmentSpecResults = {[key: string]: unknown, ...};
 
 /**
  * A utility for resolving and subscribing to the results of a fragment spec
@@ -260,7 +245,7 @@ export interface RecordSource {
 /**
  * A collection of records keyed by id.
  */
-export type RecordSourceJSON = {[DataID]: ?RecordJSON};
+export type RecordSourceJSON = {+[DataID]: ?RecordJSON};
 
 /**
  * A read/write interface for accessing and updating graph data.
@@ -273,10 +258,10 @@ export interface MutableRecordSource extends RecordSource {
 }
 
 export type CheckOptions = {
-  handlers: $ReadOnlyArray<MissingFieldHandler>,
-  defaultActorIdentifier: ActorIdentifier,
-  getTargetForActor: (actorIdentifier: ActorIdentifier) => MutableRecordSource,
-  getSourceForActor: (actorIdentifier: ActorIdentifier) => RecordSource,
+  +handlers: ReadonlyArray<MissingFieldHandler>,
+  +defaultActorIdentifier: ActorIdentifier,
+  +getTargetForActor: (actorIdentifier: ActorIdentifier) => MutableRecordSource,
+  +getSourceForActor: (actorIdentifier: ActorIdentifier) => RecordSource,
 };
 
 export type OperationAvailability =
@@ -321,7 +306,7 @@ export interface Store {
   notify(
     sourceOperation?: OperationDescriptor,
     invalidateStore?: boolean,
-  ): $ReadOnlyArray<RequestDescriptor>;
+  ): ReadonlyArray<RequestDescriptor>;
 
   /**
    * Publish new information (e.g. from the network) to the store, updating its
@@ -369,7 +354,7 @@ export interface Store {
    * Will return an opaque snapshot of the current invalidation state of
    * the data ids that were provided.
    */
-  lookupInvalidationState(dataIDs: $ReadOnlyArray<DataID>): InvalidationState;
+  lookupInvalidationState(dataIDs: ReadonlyArray<DataID>): InvalidationState;
 
   /**
    * Given the previous invalidation state for those
@@ -438,6 +423,16 @@ export interface StoreSubscriptions {
   ): void;
 
   /**
+   * Same as `updateSubscriptions`, except it only notifies subscriptions with stale snapshots.
+   */
+  updateStaleSubscriptions(
+    source: RecordSource,
+    updatedRecordIDs: DataIDSet,
+    updatedOwners: Array<RequestDescriptor>,
+    sourceOperation?: OperationDescriptor,
+  ): void;
+
+  /**
    * returns the number of subscriptions
    */
   size(): number;
@@ -454,8 +449,10 @@ export type Scheduler = (() => void) => void;
  */
 export type TaskScheduler = {
   +cancel: (id: string) => void,
-  +schedule: (fn: () => void) => string,
+  +schedule: (fn: () => void, priority?: TaskPriority) => string,
 };
+
+export type TaskPriority = 'default' | 'low';
 
 /**
  * An interface for imperatively getting/setting properties of a `Record`. This interface
@@ -474,18 +471,24 @@ export interface RecordProxy {
     args?: ?Variables,
   ): RecordProxy;
   getType(): string;
-  getValue(name: string, args?: ?Variables): mixed;
+  getValue(name: string, args?: ?Variables): unknown;
+  getErrors(name: string, args?: ?Variables): ?ReadonlyArray<TRelayFieldError>;
   setLinkedRecord(
     record: RecordProxy,
     name: string,
     args?: ?Variables,
   ): RecordProxy;
   setLinkedRecords(
-    records: $ReadOnlyArray<?RecordProxy>,
+    records: ReadonlyArray<?RecordProxy>,
     name: string,
     args?: ?Variables,
   ): RecordProxy;
-  setValue(value: mixed, name: string, args?: ?Variables): RecordProxy;
+  setValue(
+    value: unknown,
+    name: string,
+    args?: ?Variables,
+    errors?: ?ReadonlyArray<TRelayFieldError>,
+  ): RecordProxy;
   invalidateRecord(): void;
 }
 
@@ -494,7 +497,7 @@ export interface ReadOnlyRecordProxy {
   getLinkedRecord(name: string, args?: ?Variables): ?RecordProxy;
   getLinkedRecords(name: string, args?: ?Variables): ?Array<?RecordProxy>;
   getType(): string;
-  getValue(name: string, args?: ?Variables): mixed;
+  getValue(name: string, args?: ?Variables): unknown;
 }
 
 /**
@@ -554,12 +557,12 @@ export interface RecordSourceSelectorProxy extends RecordSourceProxy {
 
 export type SuspenseFragmentLogEvent = {
   +name: 'suspense.fragment',
-  +data: mixed,
+  +data: unknown,
   +fragment: ReaderFragment,
   +isRelayHooks: boolean,
   +isMissingData: boolean,
   +isPromiseCached: boolean,
-  +pendingOperations: $ReadOnlyArray<RequestDescriptor>,
+  +pendingOperations: ReadonlyArray<RequestDescriptor>,
 };
 
 export type SuspenseQueryLogEvent = {
@@ -578,7 +581,7 @@ export type QueryResourceFetchLogEvent = {
   +resourceID: number,
   +operation: OperationDescriptor,
   // value from ProfilerContext
-  +profilerContext: mixed,
+  +profilerContext: unknown,
   // FetchPolicy from Relay Hooks
   +fetchPolicy: string,
   // RenderPolicy from Relay Hooks
@@ -591,14 +594,14 @@ export type QueryResourceRetainLogEvent = {
   +name: 'queryresource.retain',
   +resourceID: number,
   // value from ProfilerContext
-  +profilerContext: mixed,
+  +profilerContext: unknown,
 };
 
 export type FragmentResourceMissingDataLogEvent = {
   // Indicates FragmentResource is going to return a result that is missing
   // data.
   +name: 'fragmentresource.missing_data',
-  +data: mixed,
+  +data: unknown,
   +fragment: ReaderFragment,
   +isRelayHooks: boolean,
   // Are we reading this result from the fragment resource cache?
@@ -612,13 +615,13 @@ export type PendingOperationFoundLogEvent = {
   +name: 'pendingoperation.found',
   +fragment: ReaderFragment,
   +fragmentOwner: RequestDescriptor,
-  +pendingOperations: $ReadOnlyArray<RequestDescriptor>,
+  +pendingOperations: ReadonlyArray<RequestDescriptor>,
 };
 
 export type NetworkInfoLogEvent = {
   +name: 'network.info',
   +networkRequestId: number,
-  +info: mixed,
+  +info: unknown,
 };
 
 export type NetworkStartLogEvent = {
@@ -691,6 +694,11 @@ export type ExecuteCompleteLogEvent = {
   +executeId: number,
 };
 
+export type ExecuteUnsubscribeLogEvent = {
+  +name: 'execute.unsubscribe',
+  +executeId: number,
+};
+
 export type ExecuteNormalizeStart = {
   +name: 'execute.normalize.start',
   +operation: OperationDescriptor,
@@ -709,6 +717,14 @@ export type StoreDataCheckerStartEvent = {
 export type StoreDataCheckerEndEvent = {
   +name: 'store.datachecker.end',
   +selector: NormalizationSelector,
+};
+
+export type StoreDataCheckerMissingEvent = {
+  +name: 'store.datachecker.missing',
+  +kind: 'scalar' | 'linked' | 'pluralLinked' | 'unknown_record',
+  +dataID: DataID,
+  +fieldName?: string,
+  +storageKey?: string,
 };
 
 export type StorePublishLogEvent = {
@@ -769,9 +785,20 @@ export type StoreNotifySubscriptionLogEvent = {
   +nextSnapshot: Snapshot,
 };
 
+export type ReaderReadFragmentSpread = {
+  +name: 'reader.fragmentSpread',
+  fragmentName: string,
+  data: SelectorData,
+};
+
+export type ReaderRead = {
+  name: 'reader.read',
+  selector: SingularReaderSelector,
+};
+
 export type EntrypointRootConsumeLogEvent = {
   +name: 'entrypoint.root.consume',
-  +profilerContext: mixed,
+  +profilerContext: unknown,
   +rootModuleID: string,
 };
 
@@ -788,12 +815,32 @@ export type UseFragmentSubscriptionMissedUpdates = {
   +hasDataChanges: boolean,
 };
 
+/**
+ * This event is logged when two strong objects share the same id,
+ * but have different types, resulting in an collision in the store.
+ */
+export type IdCollisionTypenameLogEvent = {
+  +name: 'idCollision.typename',
+  +previous_typename: string,
+  +new_typename: string,
+};
+
+export type FetchQueryFetchLogEvent = {
+  +name: 'fetchquery.fetch',
+  +operation: OperationDescriptor,
+  // FetchPolicy from Relay Hooks
+  +fetchPolicy: string,
+  +queryAvailability: OperationAvailability,
+  +shouldFetch: boolean,
+};
+
 export type LogEvent =
   | SuspenseFragmentLogEvent
   | SuspenseQueryLogEvent
   | QueryResourceFetchLogEvent
   | QueryResourceRetainLogEvent
   | FragmentResourceMissingDataLogEvent
+  | IdCollisionTypenameLogEvent
   | PendingOperationFoundLogEvent
   | NetworkInfoLogEvent
   | NetworkStartLogEvent
@@ -807,10 +854,12 @@ export type LogEvent =
   | ExecuteAsyncModuleLogEvent
   | ExecuteErrorLogEvent
   | ExecuteCompleteLogEvent
+  | ExecuteUnsubscribeLogEvent
   | ExecuteNormalizeStart
   | ExecuteNormalizeEnd
   | StoreDataCheckerStartEvent
   | StoreDataCheckerEndEvent
+  | StoreDataCheckerMissingEvent
   | StorePublishLogEvent
   | StoreSnapshotLogEvent
   | StoreLookupStartEvent
@@ -825,10 +874,13 @@ export type LogEvent =
   | EntrypointRootConsumeLogEvent
   | LiveResolverBatchStartLogEvent
   | LiveResolverBatchEndLogEvent
-  | UseFragmentSubscriptionMissedUpdates;
+  | UseFragmentSubscriptionMissedUpdates
+  | FetchQueryFetchLogEvent
+  | ReaderRead
+  | ReaderReadFragmentSpread;
 
 export type LogFunction = LogEvent => void;
-export type LogRequestInfoFunction = mixed => void;
+export type LogRequestInfoFunction = unknown => void;
 
 /**
  * The public API of Relay core. Represents an encapsulated environment with its
@@ -838,7 +890,7 @@ export interface IEnvironment {
   /**
    * Extra information attached to the environment instance
    */
-  +options: mixed;
+  +options: unknown;
 
   /**
    * **UNSTABLE** Event based logging API thats scoped to the environment.
@@ -1031,8 +1083,8 @@ export interface IEnvironment {
  */
 export type ModuleImportPointer = {
   +__fragmentPropName: ?string,
-  +__module_component: mixed,
-  +$fragmentSpreads: mixed,
+  +__module_component: unknown,
+  +$fragmentSpreads: unknown,
   ...
 };
 
@@ -1046,7 +1098,7 @@ export type DataIDSet = Set<DataID>;
  * A function that updates a store (via a proxy) given the results of a "handle"
  * field payload.
  */
-export type Handler = $ReadOnly<{
+export type Handler = Readonly<{
   update: (store: RecordSourceProxy, fieldPayload: HandleFieldPayload) => void,
   ...
 }>;
@@ -1091,11 +1143,11 @@ export type HandleFieldPayload = {
  */
 export type ModuleImportPayload = {
   +kind: 'ModuleImportPayload',
-  +args: ?$ReadOnlyArray<NormalizationArgument>,
+  +args: ?ReadonlyArray<NormalizationArgument>,
   +data: PayloadData,
   +dataID: DataID,
-  +operationReference: mixed,
-  +path: $ReadOnlyArray<string>,
+  +operationReference: unknown,
+  +path: ReadonlyArray<string>,
   +typeName: string,
   +variables: Variables,
   +actorIdentifier: ?ActorIdentifier,
@@ -1121,7 +1173,7 @@ export type ActorPayload = {
   +data: PayloadData,
   +dataID: DataID,
   +node: NormalizationLinkedField,
-  +path: $ReadOnlyArray<string>,
+  +path: ReadonlyArray<string>,
   +typeName: string,
   +variables: Variables,
   +actorIdentifier: ActorIdentifier,
@@ -1141,7 +1193,7 @@ export type DeferPlaceholder = {
   +kind: 'defer',
   +data: PayloadData,
   +label: string,
-  +path: $ReadOnlyArray<string>,
+  +path: ReadonlyArray<string>,
   +selector: NormalizationSelector,
   +typeName: string,
   +actorIdentifier: ?ActorIdentifier,
@@ -1149,7 +1201,7 @@ export type DeferPlaceholder = {
 export type StreamPlaceholder = {
   +kind: 'stream',
   +label: string,
-  +path: $ReadOnlyArray<string>,
+  +path: ReadonlyArray<string>,
   +parentID: DataID,
   +node: NormalizationSelectableNode,
   +variables: Variables,
@@ -1162,6 +1214,7 @@ export type NormalizeResponseFunction = (
   selector: NormalizationSelector,
   typeName: string,
   options: NormalizationOptions,
+  useExecTimeResolvers: boolean,
 ) => RelayResponsePayload;
 
 /**
@@ -1175,12 +1228,12 @@ export type OperationLoader = {
    * Synchronously load an operation, returning either the node or null if it
    * cannot be resolved synchronously.
    */
-  get(reference: mixed): ?NormalizationRootNode,
+  get(reference: unknown): ?NormalizationRootNode,
 
   /**
    * Asynchronously load an operation.
    */
-  load(reference: mixed): Promise<?NormalizationRootNode>,
+  load(reference: unknown): Promise<?NormalizationRootNode>,
 };
 
 /**
@@ -1235,7 +1288,7 @@ export type MissingFieldHandler =
         parentRecord: ?ReadOnlyRecordProxy,
         args: Variables,
         store: ReadOnlyRecordSourceProxy,
-      ) => mixed,
+      ) => unknown,
     }
   | {
       kind: 'linked',
@@ -1276,7 +1329,9 @@ export type MissingFieldHandler =
 export type MissingExpectedDataLogEvent = {
   +kind: 'missing_expected_data.log',
   +owner: string,
-  +fieldPath: string,
+  fieldPath: string, // Purposefully mutable to allow lazy construction in RelayReader
+  // To populate this, you should pass the value to a ReactRelayLoggingContext
+  +uiContext: unknown | void,
 };
 
 /**
@@ -1294,21 +1349,30 @@ export type MissingExpectedDataLogEvent = {
  *
  * Relay will throw immediately after logging this event. If you wish to
  * customize the error being thrown, you may throw your own error.
+ *
+ * *NOTE*: Only throw on this event if `handled` is false. Errors that have been
+ * handled by a `@catch` directive or by making a resolver null will have
+ * `handled: true` and should not trigger a throw.
  */
 export type MissingExpectedDataThrowEvent = {
   +kind: 'missing_expected_data.throw',
   +owner: string,
-  +fieldPath: string,
+  fieldPath: string, // Purposefully mutable to allow lazy construction in RelayReader
+  +handled: boolean,
+  // To populate this, you should pass the value to a ReactRelayLoggingContext
+  +uiContext: unknown | void,
 };
 
 /**
  * A field was marked as @required(action: LOG) but was null or missing in the
  * store.
  */
-export type MissingFieldLogEvent = {
+export type MissingRequiredFieldLogEvent = {
   +kind: 'missing_required_field.log',
   +owner: string,
-  +fieldPath: string,
+  fieldPath: string, // Purposefully mutable to allow lazy construction in RelayReader
+  // To populate this, you should pass the value to a ReactRelayLoggingContext
+  +uiContext: unknown | void,
 };
 
 /**
@@ -1317,11 +1381,18 @@ export type MissingFieldLogEvent = {
  *
  * Relay will throw immediately after logging this event. If you wish to
  * customize the error being thrown, you may throw your own error.
+ *
+ * *NOTE*: Only throw on this event if `handled` is false. Errors that have been
+ * handled by a `@catch` directive or by making a resolver null will have
+ * `handled: true` and should not trigger a throw.
  */
-export type MissingFieldThrowEvent = {
+export type MissingRequiredFieldThrowEvent = {
   +kind: 'missing_required_field.throw',
   +owner: string,
-  +fieldPath: string,
+  fieldPath: string, // Purposefully mutable to allow lazy construction in RelayReader
+  +handled: boolean,
+  // To populate this, you should pass the value to a ReactRelayLoggingContext
+  +uiContext: unknown | void,
 };
 
 /**
@@ -1331,12 +1402,20 @@ export type MissingFieldThrowEvent = {
  *
  * If `@throwOnFieldError` was used on the parent query/fragment/mutation, you
  * will also receive a TODO
+ *
+ * *NOTE*: Only throw on this event if `handled` is false. Errors that have been
+ * handled by a `@catch` directive or by making a resolver null will have
+ * `handled: true` and should not trigger a throw.
  */
 export type RelayResolverErrorEvent = {
   +kind: 'relay_resolver.error',
   +owner: string,
   +fieldPath: string,
   +error: Error,
+  +shouldThrow: boolean,
+  +handled: boolean,
+  // To populate this, you should pass the value to a ReactRelayLoggingContext
+  +uiContext: unknown | void,
 };
 
 /**
@@ -1351,6 +1430,10 @@ export type RelayResolverErrorEvent = {
  *
  * https://relay.dev/docs/next/guides/catch-directive/
  * https://relay.dev/docs/next/guides/throw-on-field-error-directive/
+ *
+ * *NOTE*: Only throw on this event if `handled` is false. Errors that have been
+ * handled by a `@catch` directive or by making a resolver null will have
+ * `handled: true` and should not trigger a throw.
  */
 export type RelayFieldPayloadErrorEvent = {
   +kind: 'relay_field_payload.error',
@@ -1358,6 +1441,9 @@ export type RelayFieldPayloadErrorEvent = {
   +fieldPath: string,
   +error: TRelayFieldError,
   +shouldThrow: boolean,
+  +handled: boolean,
+  // To populate this, you should pass the value to a ReactRelayLoggingContext
+  +uiContext: unknown | void,
 };
 
 /**
@@ -1366,14 +1452,13 @@ export type RelayFieldPayloadErrorEvent = {
 export type RelayFieldLoggerEvent =
   | MissingExpectedDataLogEvent
   | MissingExpectedDataThrowEvent
-  | MissingFieldLogEvent
-  | MissingFieldThrowEvent
+  | MissingRequiredFieldLogEvent
+  | MissingRequiredFieldThrowEvent
   | RelayResolverErrorEvent
   | RelayFieldPayloadErrorEvent;
 
 /**
- * A handler for events related to @required fields. Currently reports missing
- * fields with either `action: LOG` or `action: THROW`.
+ * A handler for events related to field errors.
  */
 export type RelayFieldLogger = (event: RelayFieldLoggerEvent) => void;
 
@@ -1450,7 +1535,7 @@ export interface PublishQueue {
    * Optionally provide an OperationDescriptor indicating the source operation
    * that was being processed to produce this run.
    */
-  run(sourceOperation?: OperationDescriptor): $ReadOnlyArray<RequestDescriptor>;
+  run(sourceOperation?: OperationDescriptor): ReadonlyArray<RequestDescriptor>;
 }
 
 /**
@@ -1468,7 +1553,7 @@ export type ConcreteClientEdgeResolverReturnType<T = any> = {
  * returns a callback which should be called when the value _may_ have changed.
  *
  * While over-notification (subscription notifications when the read value has
- * not actually changed) is suported, for performance reasons, it is recommended
+ * not actually changed) is supported, for performance reasons, it is recommended
  * that the provider of the LiveState value confirms that the value has indeed
  * change before notifying Relay of the change.
  */
@@ -1489,4 +1574,4 @@ export type LiveState<+T> = {
  * `resolverContext` is set on the Relay Store.
  * This context will be passed as the third argument to the live resolver
  */
-export type ResolverContext = mixed;
+export type ResolverContext = unknown;

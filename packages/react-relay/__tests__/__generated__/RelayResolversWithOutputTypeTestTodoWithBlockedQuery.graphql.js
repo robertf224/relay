@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<ba977933c828f765a66f1e251997ea84>>
+ * @generated SignedSource<<bfc9a21befee134338f900b24cbc9e63>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -38,7 +38,7 @@ import {blocked_by as todoBlockedByResolverType} from "../../../relay-runtime/st
   rootKey: TodoBlockedByResolverFragment$key,
   args: void,
   context: TestResolverContextType,
-) => ?$ReadOnlyArray<?Todo__blocked_by$normalization>);
+) => ?ReadonlyArray<?Todo__blocked_by$normalization>);
 import type { Query__todo$normalization } from "./../../../relay-runtime/store/__tests__/resolvers/__generated__/Query__todo$normalization.graphql";
 import type { Todo__blocked_by$normalization } from "./../../../relay-runtime/store/__tests__/resolvers/__generated__/Todo__blocked_by$normalization.graphql";
 export type RelayResolversWithOutputTypeTestTodoWithBlockedQuery$variables = {|
@@ -46,7 +46,7 @@ export type RelayResolversWithOutputTypeTestTodoWithBlockedQuery$variables = {|
 |};
 export type RelayResolversWithOutputTypeTestTodoWithBlockedQuery$data = {|
   +todo: ?{|
-    +blocked_by: ?$ReadOnlyArray<?{|
+    +blocked_by: ?ReadonlyArray<?{|
       +$fragmentSpreads: RelayResolversWithOutputTypeTestFragment$fragmentType,
     |}>,
   |},
@@ -119,7 +119,7 @@ return {
           "fragment": null,
           "kind": "RelayLiveResolver",
           "name": "todo",
-          "resolverModule": require('./../../../relay-runtime/store/__tests__/resolvers/QueryTodo').todo,
+          "resolverModule": require('../../../relay-runtime/store/__tests__/resolvers/QueryTodo').todo,
           "path": "todo",
           "normalizationInfo": {
             "kind": "OutputType",
@@ -150,7 +150,7 @@ return {
                 },
                 "kind": "RelayResolver",
                 "name": "blocked_by",
-                "resolverModule": require('./../../../relay-runtime/store/__tests__/resolvers/TodoBlockedByResolver').blocked_by,
+                "resolverModule": require('../../../relay-runtime/store/__tests__/resolvers/TodoBlockedByResolver').blocked_by,
                 "path": "todo.blocked_by",
                 "normalizationInfo": {
                   "kind": "OutputType",

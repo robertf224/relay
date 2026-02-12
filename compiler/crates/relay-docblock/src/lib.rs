@@ -28,6 +28,7 @@ use docblock_shared::ON_INTERFACE_FIELD;
 use docblock_shared::ON_TYPE_FIELD;
 use docblock_shared::OUTPUT_TYPE_FIELD;
 use docblock_shared::RELAY_RESOLVER_FIELD;
+use docblock_shared::RETURN_FRAGMENT_FIELD;
 use docblock_shared::ROOT_FRAGMENT_FIELD;
 use docblock_shared::SEMANTIC_NON_NULL_FIELD;
 use docblock_shared::WEAK_FIELD;
@@ -44,6 +45,7 @@ pub use validate_resolver_schema::validate_resolver_schema;
 pub struct ParseOptions<'a> {
     pub enable_interface_output_type: &'a FeatureFlag,
     pub allow_resolver_non_nullable_return_type: &'a FeatureFlag,
+    pub enable_legacy_verbose_resolver_syntax: &'a FeatureFlag,
 }
 
 pub fn parse_docblock_ast(
@@ -64,18 +66,17 @@ pub fn parse_docblock_ast(
 
 /// Check if this docblock has Resolver Model (type) definition
 pub fn resolver_maybe_defining_type(ast: &DocblockAST) -> bool {
-    ast.find_field(*RELAY_RESOLVER_FIELD)
-        .map_or(false, |field| {
-            if let Some(value) = field.field_value {
-                // If @RelayResolver value contains a `.`
-                // it is mostly likely a terse version of resolver
-                // field definition.
-                // values without `.` will be considered type definitions
-                !value.item.lookup().contains('.')
-            } else {
-                false
-            }
-        })
+    ast.find_field(*RELAY_RESOLVER_FIELD).is_some_and(|field| {
+        if let Some(value) = field.field_value {
+            // If @RelayResolver value contains a `.`
+            // it is mostly likely a terse version of resolver
+            // field definition.
+            // values without `.` will be considered type definitions
+            !value.item.lookup().contains('.')
+        } else {
+            false
+        }
+    })
 }
 
 pub fn extend_schema_with_resolver_type_system_definition(

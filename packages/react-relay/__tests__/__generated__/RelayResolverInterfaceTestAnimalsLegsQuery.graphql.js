@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<9d339ec2dd6244541ac1a4c374aac165>>
+ * @generated SignedSource<<cf4a77aa8f94f0c6b59d6b25107090fe>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -26,10 +26,10 @@ import type { TestResolverContextType } from "../../../relay-runtime/mutations/_
 // A type error here indicates that the type signature of the resolver module is incorrect.
 (queryAnimalsResolverType: (
   args: {|
-    requests: $ReadOnlyArray<AnimalRequest>,
+    requests: ReadonlyArray<AnimalRequest>,
   |},
   context: TestResolverContextType,
-) => ?$ReadOnlyArray<?{|
+) => ?ReadonlyArray<?{|
   +__typename: "Cat" | "Chicken" | "Fish",
   +id: DataID,
 |}>);
@@ -38,10 +38,10 @@ export type AnimalRequest = {|
   returnValidID: boolean,
 |};
 export type RelayResolverInterfaceTestAnimalsLegsQuery$variables = {|
-  requests: $ReadOnlyArray<AnimalRequest>,
+  requests: ReadonlyArray<AnimalRequest>,
 |};
 export type RelayResolverInterfaceTestAnimalsLegsQuery$data = {|
-  +animals: ?$ReadOnlyArray<?{|
+  +animals: ?ReadonlyArray<?{|
     +id: string,
     +$fragmentSpreads: RelayResolverInterfaceTestAnimalLegsFragment$fragmentType,
   |}>,
@@ -92,28 +92,28 @@ return {
         "modelResolvers": {
           "Cat": {
             "alias": null,
-            "args": [],
+            "args": null,
             "fragment": {
               "args": null,
               "kind": "FragmentSpread",
               "name": "Cat__id"
             },
             "kind": "RelayResolver",
-            "name": "animals",
-            "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./../../../relay-runtime/store/__tests__/resolvers/__generated__/Cat__id.graphql'), require('./../../../relay-runtime/store/__tests__/resolvers/CatResolvers').Cat, 'id', true),
+            "name": "__relay_model_instance",
+            "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./../../../relay-runtime/store/__tests__/resolvers/__generated__/Cat__id.graphql'), require('../../../relay-runtime/store/__tests__/resolvers/CatResolvers').Cat, 'id', true),
             "path": "animals.__relay_model_instance"
           },
           "Fish": {
             "alias": null,
-            "args": [],
+            "args": null,
             "fragment": {
               "args": null,
               "kind": "FragmentSpread",
               "name": "Fish__id"
             },
             "kind": "RelayResolver",
-            "name": "animals",
-            "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./../../../relay-runtime/store/__tests__/resolvers/__generated__/Fish__id.graphql'), require('./../../../relay-runtime/store/__tests__/resolvers/FishResolvers').Fish, 'id', true),
+            "name": "__relay_model_instance",
+            "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./../../../relay-runtime/store/__tests__/resolvers/__generated__/Fish__id.graphql'), require('../../../relay-runtime/store/__tests__/resolvers/FishResolvers').Fish, 'id', true),
             "path": "animals.__relay_model_instance"
           }
         },
@@ -123,7 +123,7 @@ return {
           "fragment": null,
           "kind": "RelayResolver",
           "name": "animals",
-          "resolverModule": require('./../../../relay-runtime/store/__tests__/resolvers/AnimalQueryResolvers').animals,
+          "resolverModule": require('../../../relay-runtime/store/__tests__/resolvers/AnimalQueryResolvers').animals,
           "path": "animals"
         },
         "linkedField": {

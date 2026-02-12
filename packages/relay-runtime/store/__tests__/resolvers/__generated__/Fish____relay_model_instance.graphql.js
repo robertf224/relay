@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<25c3c2089e62abda4b66d6be0947e878>>
+ * @generated SignedSource<<a0ddc8dc511ce93e58eef613a9701b38>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -28,10 +28,10 @@ import type { TestResolverContextType } from "../../../../mutations/__tests__/Te
   id: Fish__id$data['id'],
   args: void,
   context: TestResolverContextType,
-) => mixed);
+) => unknown);
 declare export opaque type Fish____relay_model_instance$fragmentType: FragmentType;
 export type Fish____relay_model_instance$data = {|
-  +__relay_model_instance: $NonMaybeType<ReturnType<typeof fishRelayModelInstanceResolverType>>,
+  +__relay_model_instance: NonNullable<ReturnType<typeof fishRelayModelInstanceResolverType>>,
   +$fragmentType: Fish____relay_model_instance$fragmentType,
 |};
 export type Fish____relay_model_instance$key = {
@@ -57,7 +57,7 @@ var node/*: ReaderFragment*/ = {
       },
       "kind": "RelayResolver",
       "name": "__relay_model_instance",
-      "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./Fish__id.graphql'), require('./../FishResolvers').Fish, 'id', true),
+      "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./Fish__id.graphql'), require('../FishResolvers').Fish, 'id', true),
       "path": "__relay_model_instance"
     }
   ],

@@ -28,6 +28,11 @@ const {
   MockPayloadGenerator,
   createMockEnvironment,
 } = require('relay-test-utils');
+const {
+  injectPromisePolyfill__DEPRECATED,
+} = require('relay-test-utils-internal');
+
+injectPromisePolyfill__DEPRECATED();
 
 describe('when using queuePendingOperation, queueOperationResolver and preloadQuery in tests', () => {
   const query = graphql`
@@ -83,7 +88,7 @@ describe('when using queuePendingOperation, queueOperationResolver and preloadQu
             <Component prefetched={prefetched} />
           </React.Suspense>
         </RelayEnvironmentProvider>,
-        // $FlowFixMe[prop-missing]
+        // $FlowFixMe[incompatible-type]
         {
           unstable_isConcurrent: true,
         },
@@ -152,7 +157,9 @@ describe('when generating multiple payloads for deferred data', () => {
       node(id: $id) {
         id
         ... on User {
-          ...RelayMockEnvironmentTestWithDeferFragment_user @defer
+          ...RelayMockEnvironmentTestWithDeferFragment_user
+            @dangerously_unaliased_fixme
+            @defer
         }
       }
     }
@@ -191,7 +198,7 @@ describe('when generating multiple payloads for deferred data', () => {
             <Component />
           </React.Suspense>
         </RelayEnvironmentProvider>,
-        // $FlowFixMe[prop-missing]
+        // $FlowFixMe[incompatible-type]
         {
           unstable_isConcurrent: true,
         },
@@ -199,6 +206,8 @@ describe('when generating multiple payloads for deferred data', () => {
     });
     invariant(renderer != null, 'should have been rendered');
 
+    /* $FlowFixMe[invalid-compare] Error discovered during Constant Condition
+     * roll out. See https://fburl.com/workplace/4oq3zi07. */
     const isSuspended = () => renderer.toJSON() === 'Fallback';
 
     const generateData = (resolvers: MockResolvers) => {

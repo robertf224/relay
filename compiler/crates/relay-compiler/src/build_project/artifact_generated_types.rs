@@ -10,8 +10,8 @@ use graphql_ir::FragmentDefinition;
 use graphql_ir::OperationDefinition;
 use graphql_syntax::OperationKind;
 use relay_config::TypegenLanguage;
-use relay_transforms::RefetchableMetadata;
 use relay_transforms::INLINE_DIRECTIVE_NAME;
+use relay_transforms::RefetchableMetadata;
 use relay_transforms::UPDATABLE_DIRECTIVE;
 use relay_typegen::has_raw_response_type_directive;
 
@@ -138,14 +138,26 @@ impl ArtifactGeneratedTypes {
                 )),
             }
         } else if let Some(refetchable_metadata) = RefetchableMetadata::find(&fragment.directives) {
-            Self {
-                imported_types: "ReaderFragment, RefetchableFragment",
-                ast_type: "ReaderFragment",
-                exported_type: Some(format!(
-                    "RefetchableFragment<\n  {name}$fragmentType,\n  {name}$data,\n  {refetchable_name}$variables,\n>",
-                    name = fragment.name.item,
-                    refetchable_name = refetchable_metadata.operation_name
-                )),
+            if refetchable_metadata.is_prefetchable_pagination {
+                Self {
+                    imported_types: "ReaderFragment, PrefetchableRefetchableFragment",
+                    ast_type: "ReaderFragment",
+                    exported_type: Some(format!(
+                        "PrefetchableRefetchableFragment<\n  {name}$fragmentType,\n  {name}$data,\n  {name}__edges$data,\n  {refetchable_name}$variables,\n>",
+                        name = fragment.name.item,
+                        refetchable_name = refetchable_metadata.operation_name
+                    )),
+                }
+            } else {
+                Self {
+                    imported_types: "ReaderFragment, RefetchableFragment",
+                    ast_type: "ReaderFragment",
+                    exported_type: Some(format!(
+                        "RefetchableFragment<\n  {name}$fragmentType,\n  {name}$data,\n  {refetchable_name}$variables,\n>",
+                        name = fragment.name.item,
+                        refetchable_name = refetchable_metadata.operation_name
+                    )),
+                }
             }
         } else if is_updatable_fragment {
             Self {

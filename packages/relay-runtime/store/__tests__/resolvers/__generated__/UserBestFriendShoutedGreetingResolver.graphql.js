@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<b5beed58738d8ebc11a485d845991b6a>>
+ * @generated SignedSource<<5d0863ddd15ce4da02d3ec80b748ff93>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -32,7 +32,7 @@ import type { TestResolverContextType } from "../../../../mutations/__tests__/Te
 declare export opaque type UserBestFriendShoutedGreetingResolver$fragmentType: FragmentType;
 export type UserBestFriendShoutedGreetingResolver$data = {|
   +friends: ?{|
-    +edges: ?$ReadOnlyArray<?{|
+    +edges: ?ReadonlyArray<?{|
       +cursor: ?string,
       +node: ?{|
         +greeting: ?string,
@@ -101,7 +101,7 @@ var node/*: ReaderFragment*/ = {
                   },
                   "kind": "RelayResolver",
                   "name": "greeting",
-                  "resolverModule": require('./../UserGreetingResolver').greeting,
+                  "resolverModule": require('../UserGreetingResolver').greeting,
                   "path": "friends.edges.node.greeting"
                 }
               ],

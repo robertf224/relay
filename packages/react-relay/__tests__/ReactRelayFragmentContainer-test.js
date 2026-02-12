@@ -88,6 +88,7 @@ describe('ReactRelayFragmentContainer', () => {
       query ReactRelayFragmentContainerTestUserQuery($id: ID!) {
         node(id: $id) {
           ...ReactRelayFragmentContainerTestUserFragment
+            @dangerously_unaliased_fixme
         }
       }
     `;
@@ -99,6 +100,7 @@ describe('ReactRelayFragmentContainer', () => {
       ) {
         node(id: $id) {
           ...ReactRelayFragmentContainerTestUserFragment
+            @dangerously_unaliased_fixme
             @arguments(cond: $condGlobal)
         }
       }
@@ -270,10 +272,8 @@ describe('ReactRelayFragmentContainer', () => {
         id: '4',
         name: 'Zuck',
       },
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       isMissingData: false,
       seenRecords: expect.any(Object),
@@ -312,7 +312,6 @@ describe('ReactRelayFragmentContainer', () => {
           name: 'Mark', // !== 'Zuck'
         },
         seenRecords: {},
-        relayResolverErrors: [],
       }),
     );
 
@@ -374,10 +373,8 @@ describe('ReactRelayFragmentContainer', () => {
         name: 'Joe',
       },
       isMissingData: false,
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       seenRecords: expect.any(Object),
       selector: createReaderSelector(
@@ -434,10 +431,8 @@ describe('ReactRelayFragmentContainer', () => {
         // Name is excluded since value of cond is now false
       },
       isMissingData: false,
-      missingRequiredFields: null,
-      errorResponseFields: null,
+      fieldErrors: null,
       missingLiveResolverFields: [],
-      relayResolverErrors: [],
       missingClientEdges: null,
       seenRecords: expect.any(Object),
       selector: createReaderSelector(

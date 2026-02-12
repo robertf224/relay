@@ -14,6 +14,7 @@
 import type {QueryResult} from './QueryResource';
 import type {
   CacheConfig,
+  DataID,
   FetchPolicy,
   IEnvironment,
   ReaderFragment,
@@ -21,13 +22,11 @@ import type {
   SelectorData,
   Snapshot,
 } from 'relay-runtime';
-import type {
-  MissingClientEdgeRequestInfo,
-  MissingLiveResolverField,
-} from 'relay-runtime/store/RelayStoreTypes';
+import type {MissingClientEdgeRequestInfo} from 'relay-runtime/store/RelayStoreTypes';
 
 const {getQueryResourceForEnvironment} = require('./QueryResource');
 const useRelayEnvironment = require('./useRelayEnvironment');
+const useRelayLoggingContext = require('./useRelayLoggingContext');
 const invariant = require('invariant');
 const {useDebugValue, useEffect, useMemo, useRef, useState} = require('react');
 const {
@@ -48,10 +47,10 @@ type FragmentQueryOptions = {
   networkCacheConfig?: ?CacheConfig,
 };
 
-type FragmentState = $ReadOnly<
+type FragmentState = Readonly<
   | {kind: 'bailout'}
   | {kind: 'singular', snapshot: Snapshot, epoch: number}
-  | {kind: 'plural', snapshots: $ReadOnlyArray<Snapshot>, epoch: number},
+  | {kind: 'plural', snapshots: ReadonlyArray<Snapshot>, epoch: number},
 >;
 
 type StateUpdaterFunction<T> = ((T) => T) => void;
@@ -68,7 +67,7 @@ function isMissingData(state: FragmentState): boolean {
 
 function getMissingClientEdges(
   state: FragmentState,
-): $ReadOnlyArray<MissingClientEdgeRequestInfo> | null {
+): ReadonlyArray<MissingClientEdgeRequestInfo> | null {
   if (state.kind === 'bailout') {
     return null;
   } else if (state.kind === 'singular') {
@@ -89,13 +88,13 @@ function getMissingClientEdges(
 
 function getSuspendingLiveResolver(
   state: FragmentState,
-): $ReadOnlyArray<MissingLiveResolverField> | null {
+): ReadonlyArray<DataID> | null {
   if (state.kind === 'bailout') {
     return null;
   } else if (state.kind === 'singular') {
     return state.snapshot.missingLiveResolverFields ?? null;
   } else {
-    let missingFields: null | Array<MissingLiveResolverField> = null;
+    let missingFields: null | Array<DataID> = null;
     for (const snapshot of state.snapshots) {
       if (snapshot.missingLiveResolverFields) {
         missingFields = missingFields ?? [];
@@ -111,23 +110,20 @@ function getSuspendingLiveResolver(
 function handlePotentialSnapshotErrorsForState(
   environment: IEnvironment,
   state: FragmentState,
+  loggingContext: unknown | void,
 ): void {
   if (state.kind === 'singular') {
     handlePotentialSnapshotErrors(
       environment,
-      state.snapshot.missingRequiredFields,
-      state.snapshot.relayResolverErrors,
-      state.snapshot.errorResponseFields,
-      state.snapshot.selector.node.metadata?.throwOnFieldError ?? false,
+      state.snapshot.fieldErrors,
+      loggingContext,
     );
   } else if (state.kind === 'plural') {
     for (const snapshot of state.snapshots) {
       handlePotentialSnapshotErrors(
         environment,
-        snapshot.missingRequiredFields,
-        snapshot.relayResolverErrors,
-        snapshot.errorResponseFields,
-        snapshot.selector.node.metadata?.throwOnFieldError ?? false,
+        snapshot.fieldErrors,
+        loggingContext,
       );
     }
   }
@@ -159,21 +155,19 @@ function handleMissedUpdates(
     );
     const updatedCurrentSnapshot: Snapshot = {
       data: updatedData,
+      fieldErrors: currentSnapshot.fieldErrors,
       isMissingData: currentSnapshot.isMissingData,
       missingClientEdges: currentSnapshot.missingClientEdges,
       missingLiveResolverFields: currentSnapshot.missingLiveResolverFields,
       seenRecords: currentSnapshot.seenRecords,
       selector: currentSnapshot.selector,
-      missingRequiredFields: currentSnapshot.missingRequiredFields,
-      relayResolverErrors: currentSnapshot.relayResolverErrors,
-      errorResponseFields: currentSnapshot.errorResponseFields,
     };
     return [
       updatedData !== state.snapshot.data,
       {
+        epoch: currentEpoch,
         kind: 'singular',
         snapshot: updatedCurrentSnapshot,
-        epoch: currentEpoch,
       },
     ];
   } else {
@@ -185,14 +179,12 @@ function handleMissedUpdates(
       const updatedData = recycleNodesInto(snapshot.data, currentSnapshot.data);
       const updatedCurrentSnapshot: Snapshot = {
         data: updatedData,
+        fieldErrors: currentSnapshot.fieldErrors,
         isMissingData: currentSnapshot.isMissingData,
         missingClientEdges: currentSnapshot.missingClientEdges,
         missingLiveResolverFields: currentSnapshot.missingLiveResolverFields,
         seenRecords: currentSnapshot.seenRecords,
         selector: currentSnapshot.selector,
-        missingRequiredFields: currentSnapshot.missingRequiredFields,
-        relayResolverErrors: currentSnapshot.relayResolverErrors,
-        errorResponseFields: currentSnapshot.errorResponseFields,
       };
       if (updatedData !== snapshot.data) {
         didMissUpdates = true;
@@ -206,9 +198,9 @@ function handleMissedUpdates(
     return [
       didMissUpdates,
       {
+        epoch: currentEpoch,
         kind: 'plural',
         snapshots: currentSnapshots,
-        epoch: currentEpoch,
       },
     ];
   }
@@ -217,10 +209,10 @@ function handleMissedUpdates(
 function handleMissingClientEdge(
   environment: IEnvironment,
   parentFragmentNode: ReaderFragment,
-  parentFragmentRef: mixed,
+  parentFragmentRef: unknown,
   missingClientEdgeRequestInfo: MissingClientEdgeRequestInfo,
   queryOptions?: FragmentQueryOptions,
-): [QueryResult, ?Promise<mixed>] {
+): [QueryResult, ?Promise<unknown>] {
   const originalVariables = getVariablesFromFragment(
     parentFragmentNode,
     parentFragmentRef,
@@ -273,8 +265,8 @@ function subscribeToSnapshot(
           if (updates != null) {
             const [dataChanged, nextState] = updates;
             environment.__log({
-              name: 'useFragment.subscription.missedUpdates',
               hasDataChanges: dataChanged,
+              name: 'useFragment.subscription.missedUpdates',
             });
             hasPendingStateChanges.current = dataChanged;
             return dataChanged ? nextState : prevState;
@@ -285,9 +277,9 @@ function subscribeToSnapshot(
 
         hasPendingStateChanges.current = true;
         return {
+          epoch: environment.getStore().getEpoch(),
           kind: 'singular',
           snapshot: latestSnapshot,
-          epoch: environment.getStore().getEpoch(),
         };
       });
     });
@@ -309,8 +301,8 @@ function subscribeToSnapshot(
             if (updates != null) {
               const [dataChanged, nextState] = updates;
               environment.__log({
-                name: 'useFragment.subscription.missedUpdates',
                 hasDataChanges: dataChanged,
+                name: 'useFragment.subscription.missedUpdates',
               });
               hasPendingStateChanges.current =
                 hasPendingStateChanges.current || dataChanged;
@@ -323,9 +315,9 @@ function subscribeToSnapshot(
           updated[index] = latestSnapshot;
           hasPendingStateChanges.current = true;
           return {
+            epoch: environment.getStore().getEpoch(),
             kind: 'plural',
             snapshots: updated,
-            epoch: environment.getStore().getEpoch(),
           };
         });
       }),
@@ -348,15 +340,15 @@ function getFragmentState(
     // Note that if fragmentRef is an empty array, fragmentSelector will be null so we'll hit the above case.
     // Null is returned by getSelector if fragmentRef has no non-null items.
     return {
+      epoch: environment.getStore().getEpoch(),
       kind: 'plural',
       snapshots: fragmentSelector.selectors.map(s => environment.lookup(s)),
-      epoch: environment.getStore().getEpoch(),
     };
   } else {
     return {
+      epoch: environment.getStore().getEpoch(),
       kind: 'singular',
       snapshot: environment.lookup(fragmentSelector),
-      epoch: environment.getStore().getEpoch(),
     };
   }
 }
@@ -364,7 +356,7 @@ function getFragmentState(
 // fragmentNode cannot change during the lifetime of the component, though fragmentRef may change.
 hook useFragmentInternal(
   fragmentNode: ReaderFragment,
-  fragmentRef: mixed,
+  fragmentRef: unknown,
   hookDisplayName: string,
   queryOptions?: FragmentQueryOptions,
 ): ?SelectorData | Array<?SelectorData> {
@@ -408,16 +400,23 @@ hook useFragmentInternal(
       'to `%s`. If the parent fragment only fetches the fragment conditionally ' +
       '- with e.g. `@include`, `@skip`, or inside a `... on SomeType { }` ' +
       'spread  - then the fragment reference will not exist. ' +
-      'In this case, pass `null` if the conditions for evaluating the ' +
-      'fragment are not met (e.g. if the `@include(if)` value is false.)',
+      'This issue can generally be fixed by adding `@alias` after `...%s`.\n' +
+      'See https://relay.dev/docs/next/guides/alias-directive/',
     fragmentNode.name,
     fragmentNode.name,
     hookDisplayName,
     fragmentNode.name,
     hookDisplayName,
+    fragmentNode.name,
   );
 
   const environment = useRelayEnvironment();
+  let loggerContext;
+  if (RelayFeatureFlags.ENABLE_UI_CONTEXT_ON_RELAY_LOGGER) {
+    // $FlowFixMe[react-rule-hook] - the condition is static
+    // $FlowFixMe[react-rule-hook-conditional]
+    loggerContext = useRelayLoggingContext();
+  }
   const [_state, setState] = useState<FragmentState>(() =>
     getFragmentState(environment, fragmentSelector),
   );
@@ -463,19 +462,23 @@ hook useFragmentInternal(
 
   // Handle the queries for any missing client edges; this may suspend.
   // FIXME handle client edges in parallel.
-  if (fragmentNode.metadata?.hasClientEdges === true) {
+  if (
+    fragmentNode.metadata?.hasClientEdges === true ||
+    RelayFeatureFlags.CHECK_ALL_FRAGMENTS_FOR_MISSING_CLIENT_EDGES
+  ) {
     // The fragment is validated to be static (in useFragment) and hasClientEdges is
     // a static (constant) property of the fragment. In practice, this effect will
     // always or never run for a given invocation of this hook.
     // eslint-disable-next-line react-hooks/rules-of-hooks
     // $FlowFixMe[react-rule-hook]
+    // $FlowFixMe[react-rule-hook-conditional]
     const [clientEdgeQueries, activeRequestPromises] = useMemo(() => {
       const missingClientEdges = getMissingClientEdges(state);
       // eslint-disable-next-line no-shadow
       let clientEdgeQueries;
       const activeRequestPromises = [];
       if (missingClientEdges?.length) {
-        clientEdgeQueries = ([]: Array<QueryResult>);
+        clientEdgeQueries = [] as Array<QueryResult>;
         for (const edge of missingClientEdges) {
           const [queryResult, requestPromise] = handleMissingClientEdge(
             environment,
@@ -500,6 +503,7 @@ hook useFragmentInternal(
     // See above note
     // eslint-disable-next-line react-hooks/rules-of-hooks
     // $FlowFixMe[react-rule-hook]
+    // $FlowFixMe[react-rule-hook-conditional]
     useEffect(() => {
       const QueryResource = getQueryResourceForEnvironment(environment);
       if (clientEdgeQueries?.length) {
@@ -521,8 +525,8 @@ hook useFragmentInternal(
     const suspendingLiveResolvers = getSuspendingLiveResolver(state);
     if (suspendingLiveResolvers != null && suspendingLiveResolvers.length > 0) {
       throw Promise.all(
-        suspendingLiveResolvers.map(({liveStateID}) => {
-          // $FlowFixMe[prop-missing] This is expected to be a LiveResolverStore
+        suspendingLiveResolvers.map(liveStateID => {
+          // $FlowFixMe[prop-missing] This is expected to be a RelayModernStore
           return environment.getStore().getLiveResolverPromise(liveStateID);
         }),
       );
@@ -534,7 +538,7 @@ hook useFragmentInternal(
     if (
       RelayFeatureFlags.ENABLE_RELAY_OPERATION_TRACKER_SUSPENSE ||
       environment !== previousEnvironment ||
-      !committedFragmentSelectorRef.current ||
+      committedFragmentSelectorRef.current === false ||
       // $FlowFixMe[react-rule-unsafe-ref]
       !areEqualSelectors(committedFragmentSelectorRef.current, fragmentSelector)
     ) {
@@ -556,7 +560,7 @@ hook useFragmentInternal(
 
   // Report required fields only if we're not suspending, since that means
   // they're missing even though we are out of options for possibly fetching them:
-  handlePotentialSnapshotErrorsForState(environment, state);
+  handlePotentialSnapshotErrorsForState(environment, state, loggerContext);
 
   const hasPendingStateChanges = useRef<boolean>(false);
 
@@ -609,6 +613,7 @@ hook useFragmentInternal(
     const fragmentRefIsNullish = fragmentRef == null; // for less sensitive memoization
     // eslint-disable-next-line react-hooks/rules-of-hooks
     // $FlowFixMe[react-rule-hook]
+    // $FlowFixMe[react-rule-hook-conditional]
     data = useMemo(() => {
       if (state.kind === 'bailout') {
         // Bailout state can happen if the fragmentRef is a plural array that is empty or has no
@@ -660,7 +665,8 @@ hook useFragmentInternal(
   if (__DEV__) {
     // eslint-disable-next-line react-hooks/rules-of-hooks
     // $FlowFixMe[react-rule-hook]
-    useDebugValue({fragment: fragmentNode.name, data});
+    // $FlowFixMe[react-rule-hook-conditional]
+    useDebugValue({data, fragment: fragmentNode.name});
   }
 
   return data;

@@ -6,7 +6,7 @@
  *
  * @oncall relay
  *
- * @generated SignedSource<<8fb43e03539a3a71a4f73a2629d70f43>>
+ * @generated SignedSource<<20e7aa82c290b33dd706457147d23b8f>>
  * @flow
  * @lightSyntaxTransform
  * @nogrep
@@ -26,12 +26,12 @@ import type { TestResolverContextType } from "../../../relay-runtime/mutations/_
 (queryEdgeToPluralModelsSomeThrowResolverType: (
   args: void,
   context: TestResolverContextType,
-) => ?$ReadOnlyArray<?{|
+) => ?ReadonlyArray<?{|
   +id: DataID,
 |}>);
 export type RelayResolverNullableModelClientEdgeTest_PluralSomeErrorModel_Query$variables = {||};
 export type RelayResolverNullableModelClientEdgeTest_PluralSomeErrorModel_Query$data = {|
-  +edge_to_plural_models_some_throw: ?$ReadOnlyArray<?{|
+  +edge_to_plural_models_some_throw: ?ReadonlyArray<?{|
     +id: string,
   |}>,
 |};
@@ -82,8 +82,8 @@ return {
               "name": "ErrorModel__id"
             },
             "kind": "RelayResolver",
-            "name": "edge_to_plural_models_some_throw",
-            "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./ErrorModel__id.graphql'), require('./../RelayResolverNullableModelClientEdge-test').ErrorModel, 'id', true),
+            "name": "__relay_model_instance",
+            "resolverModule": require('relay-runtime/experimental').resolverDataInjector(require('./ErrorModel__id.graphql'), require('../RelayResolverNullableModelClientEdge-test').ErrorModel, 'id', true),
             "path": "edge_to_plural_models_some_throw.__relay_model_instance"
           }
         },
@@ -93,7 +93,7 @@ return {
           "fragment": null,
           "kind": "RelayResolver",
           "name": "edge_to_plural_models_some_throw",
-          "resolverModule": require('./../RelayResolverNullableModelClientEdge-test').edge_to_plural_models_some_throw,
+          "resolverModule": require('../RelayResolverNullableModelClientEdge-test').edge_to_plural_models_some_throw,
           "path": "edge_to_plural_models_some_throw"
         },
         "linkedField": (v0/*: any*/)

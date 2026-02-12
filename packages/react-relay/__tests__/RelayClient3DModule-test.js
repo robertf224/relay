@@ -12,6 +12,10 @@
 'use strict';
 
 import type {LogEvent} from '../../relay-runtime/store/RelayStoreTypes';
+import type {
+  NormalizationRootNode,
+  NormalizationSplitOperation,
+} from 'relay-runtime/util/NormalizationNode';
 
 import MatchContainer from '../relay-hooks/MatchContainer';
 import React from 'react';
@@ -22,7 +26,6 @@ import {
 } from 'react-relay';
 import TestRenderer from 'react-test-renderer';
 import {
-  RelayFeatureFlags,
   ROOT_ID,
   createOperationDescriptor,
   createReaderSelector,
@@ -32,8 +35,8 @@ import {
 import RelayNetwork from 'relay-runtime/network/RelayNetwork';
 import {graphql} from 'relay-runtime/query/GraphQLTag';
 import {resetStore} from 'relay-runtime/store/__tests__/resolvers/ExampleTodoStore';
-import LiveResolverStore from 'relay-runtime/store/experimental-live-resolvers/LiveResolverStore';
 import RelayModernEnvironment from 'relay-runtime/store/RelayModernEnvironment';
+import RelayModernStore from 'relay-runtime/store/RelayModernStore';
 import RelayRecordSource from 'relay-runtime/store/RelayRecordSource';
 import {
   disallowConsoleErrors,
@@ -44,13 +47,13 @@ disallowWarnings();
 disallowConsoleErrors();
 
 class ErrorBoundary extends React.Component<$FlowFixMe, $FlowFixMe> {
-  state: {error: mixed} = {error: null};
+  state: {error: unknown} = {error: null};
 
   componentDidCatch(error: Error) {
     this.setState({error});
   }
 
-  //$FlowFixMe
+  //$FlowFixMe[unclear-type]
   render(): any {
     const {children, fallback} = this.props;
     const {error} = this.state;
@@ -96,7 +99,7 @@ const SPECIAL_USER_FRAGMENT = graphql`
 function BasicUserRenderer() {
   const queryData = useClientQuery(CLIENT_3D_TEST_QUERY, {});
   const fragmentData = useFragment(CLIENT_3D_TEST_FRAGMENT, queryData.persona);
-  const loader = (moduleProvider: mixed) => {
+  const loader = (moduleProvider: unknown) => {
     // $FlowFixMe[not-a-function]
     return moduleProvider().default;
   };
@@ -110,25 +113,27 @@ function logFn(event: LogEvent): void {
 }
 
 beforeEach(() => {
-  RelayFeatureFlags.ENABLE_RELAY_RESOLVERS = true;
   logEvents = [];
   resetStore(logFn);
-});
-
-afterEach(() => {
-  RelayFeatureFlags.ENABLE_RELAY_RESOLVERS = false;
 });
 
 describe('ClientUser', () => {
   let store;
   let environment;
+  let operationLoader;
 
   beforeEach(() => {
-    store = new LiveResolverStore(RelayRecordSource.create(), {
+    operationLoader = {
+      load: jest.fn<[unknown], Promise<NormalizationSplitOperation>>(),
+      get: jest.fn<[unknown], ?NormalizationRootNode>(),
+    };
+    store = new RelayModernStore(RelayRecordSource.create(), {
       log: logFn,
+      operationLoader,
     });
     environment = new RelayModernEnvironment({
       network: RelayNetwork.create(jest.fn()),
+      operationLoader,
       store,
       log: logFn,
     });
@@ -158,14 +163,13 @@ describe('ClientUser', () => {
       CLIENT_3D_TEST_FRAGMENT,
       querySnapshot.data?.persona,
     );
-    //$FlowFixMe
+    //$FlowFixMe[incompatible-type]
     const fragmentSnapshot = environment.lookup(fragmentSelector);
-
     const dataSelector = getSelector(
       CLIENT_USER_FRAGMENT,
       fragmentSnapshot.data?.basicUser,
     );
-    //$FlowFixMe
+    //$FlowFixMe[incompatible-type]
     const dataSnapshot = environment.lookup(dataSelector);
 
     expect(dataSnapshot.data?.data).toBe('clientUserData');
@@ -191,13 +195,20 @@ describe('ClientUser', () => {
 describe('SpecialUser', () => {
   let environment;
   let store;
+  let operationLoader;
   beforeEach(() => {
-    store = new LiveResolverStore(RelayRecordSource.create(), {
+    operationLoader = {
+      load: jest.fn<[unknown], Promise<NormalizationSplitOperation>>(),
+      get: jest.fn<[unknown], ?NormalizationRootNode>(),
+    };
+    store = new RelayModernStore(RelayRecordSource.create(), {
       log: logFn,
+      operationLoader,
     });
     environment = new RelayModernEnvironment({
       network: RelayNetwork.create(jest.fn()),
       store,
+      operationLoader,
       log: logFn,
     });
     const operation = createOperationDescriptor(CLIENT_3D_TEST_QUERY, {});
@@ -206,6 +217,7 @@ describe('SpecialUser', () => {
         basicUser: {
           __typename: 'SpecialUser',
           id: '2',
+          data: 'specialUserData',
         },
       },
     });
@@ -225,14 +237,13 @@ describe('SpecialUser', () => {
       CLIENT_3D_TEST_FRAGMENT,
       querySnapshot.data?.persona,
     );
-    //$FlowFixMe
+    //$FlowFixMe[incompatible-type]
     const fragmentSnapshot = environment.lookup(fragmentSelector);
-
     const dataSelector = getSelector(
       SPECIAL_USER_FRAGMENT,
       fragmentSnapshot.data?.basicUser,
     );
-    //$FlowFixMe
+    //$FlowFixMe[incompatible-type]
     const dataSnapshot = environment.lookup(dataSelector);
 
     expect(dataSnapshot.data?.data).toBe('specialUserData');

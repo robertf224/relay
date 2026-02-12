@@ -13,7 +13,7 @@
 
 import type {IEnvironment, RecordSource} from '../store/RelayStoreTypes';
 
-type InspectFn = (environment: IEnvironment, dataID?: ?string) => mixed;
+type InspectFn = (environment: IEnvironment, dataID?: ?string) => unknown;
 
 let inspect: InspectFn = () => {};
 
@@ -32,11 +32,14 @@ if (__DEV__) {
     }
     formattersInstalled = true;
     // $FlowFixMe[incompatible-use] D61394600
+    // $FlowFixMe[cannot-resolve-name]
     if (window.devtoolsFormatters == null) {
       // $FlowFixMe[incompatible-use] D61394600
+      // $FlowFixMe[cannot-resolve-name]
       window.devtoolsFormatters = [];
     }
     // $FlowFixMe[incompatible-use] D61394600
+    // $FlowFixMe[cannot-resolve-name]
     if (!Array.isArray(window.devtoolsFormatters)) {
       return;
     }
@@ -47,6 +50,7 @@ if (__DEV__) {
         'section.',
     );
     // $FlowFixMe[incompatible-use] D61394600
+    // $FlowFixMe[cannot-resolve-name]
     window.devtoolsFormatters.push(...createFormatters());
   };
 
@@ -77,8 +81,8 @@ if (__DEV__) {
 
     class RecordEntry {
       +key: string;
-      +value: mixed;
-      constructor(key: string, value: mixed) {
+      +value: unknown;
+      constructor(key: string, value: unknown) {
         this.key = key;
         this.value = value;
       }
@@ -134,13 +138,13 @@ if (__DEV__) {
   const getWrappedRecord = (
     source: RecordSource,
     dataID: string,
-  ): ?{[string]: mixed} => {
+  ): ?{[string]: unknown} => {
     const record = source.get(dataID);
     if (record == null) {
+      // $FlowFixMe[incompatible-type]
       return record;
     }
     return new Proxy(
-      // $FlowFixMe: Do not assume that record is an object
       {...record},
       {
         get(target, prop) {
@@ -154,7 +158,7 @@ if (__DEV__) {
               return getWrappedRecord(source, value.__ref);
             }
             if (Array.isArray(value.__refs)) {
-              // $FlowFixMe[incompatible-call]
+              // $FlowFixMe[incompatible-type]
               return value.__refs.map((ref: string) =>
                 getWrappedRecord(source, ref),
               );
