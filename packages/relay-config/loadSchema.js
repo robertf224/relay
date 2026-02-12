@@ -11,7 +11,8 @@
 
 'use strict';
 
-const {JsonSchema} = require('@rushstack/node-core-library');
+const Ajv2020 = require('ajv/dist/2020');
+const fs = require('fs');
 const path = require('path');
 
 function getSchemaPath(): string {
@@ -28,18 +29,30 @@ function getSchemaPath(): string {
 }
 
 function loadSchema(): any {
-  return JsonSchema.fromFile(getSchemaPath(), {
-    customFormats: {
-      uint8: {
-        type: 'number',
-        validate: data => data >= 0 && data <= 255,
-      },
-      uint: {
-        type: 'number',
-        validate: data => data >= 0 && data <= Number.MAX_SAFE_INTEGER,
-      },
-    },
+  const schemaData = JSON.parse(
+    fs.readFileSync(getSchemaPath(), 'utf8'),
+    (key, value) => (key === 'format' && value === null ? undefined : value),
+  );
+  const ajv = new Ajv2020({allErrors: true});
+  ajv.addFormat('uint8', {
+    type: 'number',
+    validate: (data: number) => data >= 0 && data <= 255,
   });
+  ajv.addFormat('uint', {
+    type: 'number',
+    validate: (data: number) => data >= 0 && data <= Number.MAX_SAFE_INTEGER,
+  });
+  const validate = ajv.compile(schemaData);
+  return {
+    validateObject(config: any, filepath: string) {
+      if (!validate(config)) {
+        const errors = (validate.errors || [])
+          .map(e => `  ${e.instancePath} ${e.message}`)
+          .join('\n');
+        throw new Error(`Config validation failed for ${filepath}:\n${errors}`);
+      }
+    },
+  };
 }
 
 module.exports = loadSchema;
