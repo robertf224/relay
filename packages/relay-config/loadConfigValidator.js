@@ -4,7 +4,6 @@
  * This source code is licensed under the MIT license found in the
  * LICENSE file in the root directory of this source tree.
  *
- * @flow
  * @format
  * @oncall relay
  */
@@ -15,7 +14,7 @@ const Ajv2020 = require('ajv/dist/2020');
 const fs = require('fs');
 const path = require('path');
 
-function getSchemaPath(): string {
+function getSchemaPath() {
   if (process.env.NODE_ENV === 'test') {
     return path.resolve(
       process.cwd(),
@@ -28,7 +27,7 @@ function getSchemaPath(): string {
   return path.join(__dirname, '..', 'relay-compiler-config-schema.json');
 }
 
-function loadConfigValidator(): any {
+function loadConfigValidator() {
   const schemaData = JSON.parse(
     fs.readFileSync(getSchemaPath(), 'utf8'),
     // Strip `"format": null` from schema (e.g. `StringKey`) — ajv requires format to be a string.
@@ -37,14 +36,14 @@ function loadConfigValidator(): any {
   const ajv = new Ajv2020({allErrors: true});
   ajv.addFormat('uint8', {
     type: 'number',
-    validate: (data: number) => data >= 0 && data <= 255,
+    validate: data => data >= 0 && data <= 255,
   });
   ajv.addFormat('uint', {
     type: 'number',
-    validate: (data: number) => data >= 0 && data <= Number.MAX_SAFE_INTEGER,
+    validate: data => data >= 0 && data <= Number.MAX_SAFE_INTEGER,
   });
   const validate = ajv.compile(schemaData);
-  return (config: any, configPath: string) => {
+  return (config, configPath) => {
     if (!validate(config)) {
       const errors = validate.errors
         .map(e => `  ${e.instancePath} ${e.message}`)

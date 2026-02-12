@@ -37,7 +37,7 @@
     "@babel/traverse": "^7.25.3",
     "@babel/types": "^7.25.2",
     "@jest/create-cache-key-function": "^29.7.0",
-    "@rushstack/node-core-library": "^5.19.1",
+    "ajv": "^8.13.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.0.1",
     "babel-eslint": "^10.1.0",
