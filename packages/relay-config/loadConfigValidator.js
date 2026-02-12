@@ -28,9 +28,10 @@ function getSchemaPath(): string {
   return path.join(__dirname, '..', 'relay-compiler-config-schema.json');
 }
 
-function loadSchema(): any {
+function loadConfigValidator(): any {
   const schemaData = JSON.parse(
     fs.readFileSync(getSchemaPath(), 'utf8'),
+    // Strip `"format": null` from schema (e.g. `StringKey`) — ajv requires format to be a string.
     (key, value) => (key === 'format' && value === null ? undefined : value),
   );
   const ajv = new Ajv2020({allErrors: true});
@@ -43,16 +44,14 @@ function loadSchema(): any {
     validate: (data: number) => data >= 0 && data <= Number.MAX_SAFE_INTEGER,
   });
   const validate = ajv.compile(schemaData);
-  return {
-    validateObject(config: any, filepath: string) {
-      if (!validate(config)) {
-        const errors = (validate.errors || [])
-          .map(e => `  ${e.instancePath} ${e.message}`)
-          .join('\n');
-        throw new Error(`Config validation failed for ${filepath}:\n${errors}`);
-      }
-    },
+  return (config: any, configPath: string) => {
+    if (!validate(config)) {
+      const errors = validate.errors
+        .map(e => `  ${e.instancePath} ${e.message}`)
+        .join('\n');
+      throw new Error(`Config validation failed for ${configPath}:\n${errors}`);
+    }
   };
 }
 
-module.exports = loadSchema;
+module.exports = loadConfigValidator;
