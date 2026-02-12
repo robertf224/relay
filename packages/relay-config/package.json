@@ -1,7 +1,7 @@
 {
   "name": "relay-config",
   "description": "A utility library for loading and saving Relay compiler config files.",
-  "version": "17.0.0",
+  "version": "20.1.1",
   "keywords": [
     "graphql",
     "relay"

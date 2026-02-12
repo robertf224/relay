@@ -15,8 +15,6 @@ const loadConfigValidator = require('./loadConfigValidator');
 const cosmiconfig = require('cosmiconfig');
 
 function loadConfig(folder?: string): any | void {
-  const validate = loadConfigValidator();
-
   const result = cosmiconfig('relay', {
     searchPlaces: ['relay.config.js', 'relay.config.json', 'package.json'],
   }).searchSync(folder);
@@ -25,6 +23,7 @@ function loadConfig(folder?: string): any | void {
   }
   const {config, filepath} = result;
 
+  const validate = loadConfigValidator();
   validate(config, filepath);
   return config;
 }

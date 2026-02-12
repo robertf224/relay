@@ -12,10 +12,4 @@ import { ConfigFile as RelayConfig } from './RelayConfig';
 
 declare function loadConfig(): Promise<RelayConfig>;
 
-declare function saveConfig(
-  config: RelayConfig,
-  folder: string,
-  configType: 'relay.config.js' | 'relay.config.json' | 'package.json',
-): Promise<void>;
-
-export { loadConfig, saveConfig, RelayConfig };
+export { loadConfig, RelayConfig };
